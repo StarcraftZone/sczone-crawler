@@ -1,15 +1,15 @@
 import requests
-import json
 from datetime import datetime
-from .config_helper import config
-from .redis_helper import redis_connection
+
+from utils import config
+from utils import redis
 
 
 def get_access_token():
-    access_token = redis_connection.get("sczone-crawler:token:battlenet")
+    access_token = redis.get("token:battlenet")
     if access_token is None:
-        bnetClientId = config["credentials"]["bnetClientId"]
-        bnetClientSecret = config["credentials"]["bnetClientSecret"]
+        bnetClientId = config.credentials["bnetClientId"]
+        bnetClientSecret = config.credentials["bnetClientSecret"]
         response = requests.post(
             "https://www.battlenet.com.cn/oauth/token",
             auth=(bnetClientId, bnetClientSecret),
@@ -18,7 +18,7 @@ def get_access_token():
         response_data = response.json()
         access_token = response_data["access_token"]
         expires_in = response_data["expires_in"]
-        redis_connection.set("sczone-crawler:token:battlenet", access_token, expires_in)
+        redis.set("token:battlenet", access_token, expires_in)
         print("fresh access token: " + access_token)
     return access_token
 
