@@ -1,5 +1,7 @@
-from configparser import ConfigParser
 import redis
+from configparser import ConfigParser
+from datetime import timedelta
+from utils import datetime
 
 config = ConfigParser()
 config.read("config.ini", "UTF-8")
@@ -24,6 +26,18 @@ def set(key, value):
     return redis_connection.set(get_full_key(key), value)
 
 
+def setnx(key, value):
+    return redis_connection.setnx(get_full_key(key), value)
+
+
+def setex(key, time, value):
+    return redis_connection.setex(get_full_key(key), time, value)
+
+
+def getset(key, value):
+    return redis_connection.getset(get_full_key(key), value)
+
+
 def delete(key):
     return redis_connection.delete(get_full_key(key))
 
@@ -34,3 +48,21 @@ def exists(key):
 
 def incr(key):
     return redis_connection.incr(get_full_key(key))
+
+
+def lock(key, duration: timedelta):
+    value = datetime.current_time_mills() + datetime.get_timedelta_mills(duration)
+    status = setnx(key, value)
+    if status:
+        return True
+    old_expire_time = get(key)
+    if old_expire_time is None or int(old_expire_time) < datetime.current_time_mills():
+        new_expire_time = datetime.current_time_mills() + datetime.get_timedelta_mills(duration)
+        current_expire_time = getset(key, new_expire_time)
+        if current_expire_time == old_expire_time:
+            return True
+    return False
+
+
+def unlock(key):
+    return delete(key)

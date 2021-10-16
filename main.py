@@ -6,6 +6,8 @@ from utils import redis
 from utils import datetime
 from utils import constants
 from utils import config
+from datetime import timedelta
+import time
 
 
 mongo_client = pymongo.MongoClient("mongodb://***REMOVED***:***REMOVED***@***REMOVED***:***REMOVED***")
@@ -76,25 +78,15 @@ def update_ladder(ladder, character):
     return True
 
 
-def character_job():
-    threads = config.getint("app", "characterJobThreads")
-    for _ in range(threads):
-        threading.Thread(target=character_task).start()
-
-
-def ladder_job():
-    threads = config.getint("app", "ladderJobThreads")
-    for _ in range(threads):
-        threading.Thread(target=ladder_task).start()
-
-
 def character_task():
     try:
         task_index = redis.incr(constants.CHARACTER_TASK_CURRENT_NO)
         skip = (task_index - 1) * task_size
         characters = list(mongo_db.characters.find().sort("code").skip(skip).limit(task_size))
-        if not redis.exists(constants.CHARACTER_TASK_START_TIME):
-            redis.set(constants.CHARACTER_TASK_START_TIME, datetime.current_time_str())
+        if redis.setnx(constants.CHARACTER_TASK_START_TIME, datetime.current_time_str()):
+            print(f"character task start")
+        else:
+            print(f"character task continue, skip: {skip}, limit:{task_size}")
         if len(characters) == 0:
             # 执行完成
             task_start_time = redis.get(constants.CHARACTER_TASK_START_TIME)
@@ -106,16 +98,18 @@ def character_task():
             character_all_ladders = battlenet.get_character_all_ladders(
                 character["regionNo"], character["realmNo"], character["profileNo"]
             )
+
             for ladder in character_all_ladders:
                 ladder_active_redis_key = f"ladder:active:{ladder['code']}"
                 ladder_active = redis.get(ladder_active_redis_key)
                 if ladder_active is None or ladder_active == "0":
                     # TODO: api update ladder
                     redis.set(ladder_active_redis_key, "1")
-                    print(f"update_ladder: {ladder['code']}")
-                    update_ladder(ladder, character)
-                else:
-                    print(f"跳过: {ladder['code']}")
+                    if redis.lock(f"ladder", timedelta(minutes=30)):
+                        print(f"update_ladder: {ladder['code']}")
+                        update_ladder(ladder, character)
+                    else:
+                        print(f"skip update_ladder: {ladder['code']}")
         # 递归调用
         character_task()
     except Exception:
@@ -128,12 +122,23 @@ def ladder_task():
     print("todo")
 
 
+def lock_test(i):
+    if redis.lock("lock:test:1", timedelta(milliseconds=1000)):
+        print(f"我获取到锁了:{i}")
+    else:
+        print(f"未获取到锁: {i}")
+
+
 if __name__ == "__main__":
     # print(battlenet.get_character_all_ladders(5, 1, 526043))
     # update_ladder(
     #     {"code": "5_63504", "number": 63504, "regionNo": 5, "league": "master", "gameMode": "1v1"},
     #     {"regionNo": 5, "realmNo": 1, "profileNo": 526043},
     # )
+
+    # 测试 lock
+    # for i in range(10):
+    #     threading.Thread(target=lock_test, args=(i,)).start()
 
     # 创建 mongo index
     mongo_db.characters.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
@@ -142,7 +147,12 @@ if __name__ == "__main__":
     mongo_db.teamMembers.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
 
     # 启动角色轮询任务
-    character_job()
+    for _ in range(config.getint("app", "characterJobThreads")):
+        threading.Thread(target=character_task).start()
+    character_task()
 
     # 启动天梯轮询任务
-    # ladder_job()
+    # for _ in range(config.getint("app", "ladderJobThreads")):
+    #     threading.Thread(target=ladder_task).start()
+
+

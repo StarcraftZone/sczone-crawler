@@ -1,4 +1,10 @@
 from datetime import datetime
+from datetime import timedelta
+from time import time
+
+
+def current_time_mills() -> int:
+    return int(round(time() * 1000))
 
 
 def current_time() -> datetime:
@@ -20,3 +26,7 @@ def get_time_str(time: datetime) -> str:
 def get_duration_seconds(time_start: str, time_end: str) -> int:
     delta = get_time(time_end) - get_time(time_start)
     return delta.seconds
+
+
+def get_timedelta_mills(timedelta: timedelta) -> int:
+    return round(timedelta.total_seconds() * 1000)
