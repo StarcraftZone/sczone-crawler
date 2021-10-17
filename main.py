@@ -35,7 +35,7 @@ def update_ladder(ladder, character):
         )
         # TODO: api 更新 team, "membersData": json.dumps(team["teamMembers"]),
         # TODO: 更新 mmr redis
-        print(f"update ladder_team: {ladder_team['code']}")
+
         for team_member in ladder_team["teamMembers"]:
             now = datetime.current_time()
             mongo_db.characters.update_one(
@@ -162,6 +162,27 @@ if __name__ == "__main__":
     mongo_db.teams.create_index([("ladderCode", pymongo.ASCENDING)], name="idx_ladderCode", background=True)
     mongo_db.ladders.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
     mongo_db.ladders.create_index([("active", pymongo.ASCENDING)], name="idx_active", background=True)
+
+    # 初始化数据
+    # update_ladder(
+    #     {"code": "1_303247", "number": 303247, "regionNo": 1, "league": "platinum", "gameMode": "1v1"},
+    #     {"regionNo": 1, "realmNo": 1, "profileNo": 11345205},
+    # )
+
+    # update_ladder(
+    #     {"code": "2_239600", "number": 239600, "regionNo": 2, "league": "grandmaster", "gameMode": "1v1"},
+    #     {"regionNo": 2, "realmNo": 1, "profileNo": 3437681},
+    # )
+
+    # update_ladder(
+    #     {"code": "3_76612", "number": 76612, "regionNo": 3, "league": "platinum", "gameMode": "1v1"},
+    #     {"regionNo": 3, "realmNo": 1, "profileNo": 756147},
+    # )
+
+    # update_ladder(
+    #     {"code": "5_63504", "number": 63504, "regionNo": 5, "league": "master", "gameMode": "1v1"},
+    #     {"regionNo": 5, "realmNo": 1, "profileNo": 526043},
+    # )
 
     # 启动角色轮询任务
     for _ in range(config.getint("app", "characterJobThreads")):
