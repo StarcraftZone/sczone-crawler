@@ -12,7 +12,7 @@ from datetime import timedelta
 
 mongo_client = pymongo.MongoClient("mongodb://***REMOVED***:***REMOVED***@***REMOVED***:***REMOVED***")
 mongo_db = mongo_client.yf_sczone
-task_size = 10
+task_size = 100
 
 
 def update_ladder(ladder, character):
@@ -68,7 +68,6 @@ def get_ladder_active_status(ladder):
     for team in teams:
         for teamMember in team["teamMembers"]:
             if update_ladder(ladder, teamMember):
-                print(f"ladder updated: {ladder['code']}")
                 return True
     return False
 
@@ -94,7 +93,7 @@ def character_task(region_no):
             redis.delete(keys.character_task_start_time(region_no))
         else:
             for character in characters:
-                if redis.lock(f"character:{character['code']}", timedelta(minutes=10)):
+                if redis.lock(f"character:{character['code']}", timedelta(minutes=30)):
                     character_all_ladders = battlenet.get_character_all_ladders(
                         character["regionNo"], character["realmNo"], character["profileNo"]
                     )
@@ -106,8 +105,6 @@ def character_task(region_no):
                             if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=30)):
                                 print(f"update_ladder: {ladder['code']}")
                                 update_ladder(ladder, character)
-                            else:
-                                print(f"skip update_ladder: {ladder['code']}")
         # 递归调用
         character_task(region_no)
     except Exception:
@@ -144,7 +141,7 @@ def ladder_task(region_no):
             threading.Timer(60, ladder_task, args=(region_no,)).start()
         else:
             for ladder in ladders:
-                if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=10)):
+                if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=30)):
                     if not get_ladder_active_status(ladder):
                         mongo_db.ladders.update_one(
                             {"code": ladder["code"]}, {"$set": {"active": False, "updateTime": datetime.current_time()}}
@@ -158,13 +155,6 @@ def ladder_task(region_no):
         print(traceback.format_exc())
         # 出错后，延迟 5 秒递归，防止过快重试
         threading.Timer(5, ladder_task, args=(region_no,)).start()
-
-
-def lock_test(i):
-    if redis.lock("test:1", timedelta(milliseconds=1000)):
-        print(f"我获取到锁了:{i}")
-    else:
-        print(f"未获取到锁: {i}")
 
 
 if __name__ == "__main__":
