@@ -1,0 +1,23 @@
+image: docker:latest
+
+variables:
+    REGISTRY: '***REMOVED***'
+    USERNAME: '***REMOVED***'
+    PASSWORD: '***REMOVED***'
+    NAMESPACE: 'yuanfen'
+    PROJECT_NAME: 'sczone-crawler'
+
+stages:
+    - build
+
+docker-build:
+    stage: build
+    image: docker:latest
+    script:
+        - docker login --username=$USERNAME $REGISTRY -p $PASSWORD
+        - docker build -t $REGISTRY/$NAMESPACE/$PROJECT_NAME:$CI_COMMIT_REF_NAME -t $REGISTRY/$NAMESPACE/$PROJECT_NAME:latest .
+        - docker push $REGISTRY/$NAMESPACE/$PROJECT_NAME:$CI_COMMIT_REF_NAME
+        - docker push $REGISTRY/$NAMESPACE/$PROJECT_NAME:latest
+        - docker image prune -a --filter "until=24h"
+    only:
+        - tags
