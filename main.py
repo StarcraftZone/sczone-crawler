@@ -94,19 +94,20 @@ def character_task(region_no):
             redis.delete(keys.character_task_start_time(region_no))
         else:
             for character in characters:
-                character_all_ladders = battlenet.get_character_all_ladders(
-                    character["regionNo"], character["realmNo"], character["profileNo"]
-                )
+                if redis.lock(f"character:{character['code']}", timedelta(minutes=10)):
+                    character_all_ladders = battlenet.get_character_all_ladders(
+                        character["regionNo"], character["realmNo"], character["profileNo"]
+                    )
 
-                for ladder in character_all_ladders:
-                    if redis.get(f"ladder:active:{ladder['code']}") is None:
-                        # TODO: api update ladder
-                        redis.set(f"ladder:active:{ladder['code']}", "1")
-                        if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=30)):
-                            print(f"update_ladder: {ladder['code']}")
-                            update_ladder(ladder, character)
-                        else:
-                            print(f"skip update_ladder: {ladder['code']}")
+                    for ladder in character_all_ladders:
+                        if redis.get(f"ladder:active:{ladder['code']}") is None:
+                            # TODO: api update ladder
+                            redis.set(f"ladder:active:{ladder['code']}", "1")
+                            if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=30)):
+                                print(f"update_ladder: {ladder['code']}")
+                                update_ladder(ladder, character)
+                            else:
+                                print(f"skip update_ladder: {ladder['code']}")
         # 递归调用
         character_task(region_no)
     except Exception:

@@ -34,6 +34,10 @@ def setex(key, time, value):
     return redis_connection.setex(get_full_key(key), time, value)
 
 
+def expire(key, time):
+    return redis_connection.expire(get_full_key(key), time)
+
+
 def getset(key, value):
     return redis_connection.getset(get_full_key(key), value)
 
