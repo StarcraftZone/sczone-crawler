@@ -1,6 +1,7 @@
 import pymongo
 import threading
 import traceback
+import json
 from utils import battlenet
 from utils import redis
 from utils import datetime
@@ -86,7 +87,9 @@ def character_task(region_no):
             task_start_time = redis.get(keys.character_task_start_time(region_no))
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
             print(f"character task done, duration: {task_duration_seconds}s")
-            redis.set(f"stats:duration:task:character:{datetime.current_time_str_short()}", task_duration_seconds)
+            redis.set(
+                keys.character_task_done_stats(region_no), json.dumps({"skip": skip, "duration": task_duration_seconds})
+            )
             redis.delete(keys.character_task_current_no(region_no))
             redis.delete(keys.character_task_start_time(region_no))
         else:
@@ -128,7 +131,9 @@ def ladder_task(region_no):
             task_start_time = redis.get(keys.ladder_task_start_time(region_no))
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
             print(f"ladder task done, duration: {task_duration_seconds}s")
-            redis.set(f"stats:duration:task:ladder:{datetime.current_time_str_short()}", task_duration_seconds)
+            redis.set(
+                keys.ladder_task_done_stats(region_no), json.dumps({"skip": skip, "duration": task_duration_seconds})
+            )
 
             # TODO: 将 team 更新时间早于 ladder job startTime - 3 天 的置为非活跃
             redis.delete(keys.ladder_task_current_no(region_no))
