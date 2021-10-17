@@ -85,6 +85,7 @@ def character_task():
             task_start_time = redis.get(constants.CHARACTER_TASK_START_TIME)
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
             print(f"character task done, duration: {task_duration_seconds}s")
+            redis.set(f"stats:duration:task:character:{datetime.current_time_str()}", task_duration_seconds)
             redis.delete(constants.CHARACTER_TASK_CURRENT_NO)
             redis.delete(constants.CHARACTER_TASK_START_TIME)
         else:
@@ -124,9 +125,9 @@ def ladder_task():
             task_start_time = redis.get(constants.LADDER_TASK_START_TIME)
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
             print(f"ladder task done, duration: {task_duration_seconds}s")
+            redis.set(f"stats:duration:task:ladder:{datetime.current_time_str()}", task_duration_seconds)
 
             # TODO: 将 team 更新时间早于 ladder job startTime - 3 天 的置为非活跃
-
             redis.delete(constants.LADDER_TASK_CURRENT_NO)
             redis.delete(constants.LADDER_TASK_START_TIME)
         else:
