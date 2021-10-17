@@ -38,17 +38,16 @@ def update_ladder(ladder, character):
         print(f"update ladder_team: {ladder_team['code']}")
         for team_member in ladder_team["teamMembers"]:
             now = datetime.current_time()
-            character_code = f"{team_member['region']}_{team_member['realm']}_{team_member['id']}"
             mongo_db.characters.update_one(
-                {"code": character_code},
+                {"code": team_member["code"]},
                 {
                     "$set": {
-                        "code": character_code,
-                        "regionNo": team_member["region"],
-                        "realmNo": team_member["realm"],
-                        "profileNo": team_member["id"],
+                        "code": team_member["code"],
+                        "regionNo": team_member["regionNo"],
+                        "realmNo": team_member["realmNo"],
+                        "profileNo": team_member["profileNo"],
                         "displayName": team_member["displayName"],
-                        "clanTag": team_member["clanTag"] if "clanTag" in team_member else None,
+                        "clanTag": team_member["clanTag"],
                         "updateTime": now,
                     },
                     "$setOnInsert": {"createTime": now},
@@ -67,6 +66,7 @@ def get_ladder_active_status(ladder):
     for team in teams:
         for teamMember in team["teamMembers"]:
             if update_ladder(ladder, teamMember):
+                print(f"ladder updated: {ladder['code']}")
                 return True
     return False
 
@@ -163,44 +163,9 @@ if __name__ == "__main__":
     mongo_db.ladders.create_index([("active", pymongo.ASCENDING)], name="idx_active", background=True)
 
     # 启动角色轮询任务
-    # for _ in range(config.getint("app", "characterJobThreads")):
-    #     threading.Thread(target=character_task).start()
-    # character_task()
+    for _ in range(config.getint("app", "characterJobThreads")):
+        threading.Thread(target=character_task).start()
 
     # 启动天梯轮询任务
-    # for _ in range(config.getint("app", "ladderJobThreads")):
-    #     threading.Thread(target=ladder_task).start()
-
-    # mongo_db.ladders.update_many({}, {"$set": {"active": True}})
-    # mongo_db.teams.update_many(
-    #     {"teamMembers.region": 5},
-    #     {
-    #         "$set": {
-    #             "teamMembers.$[elem].regionNo": "elem.region",
-    #             "teamMembers.$[elem].realmNo": "elem.realm",
-    #             "teamMembers.$[elem].profileNo": "elem.profile",
-    #         },
-    #     },
-    # )
-    start_time = datetime.current_time_str()
-    list = mongo_db.teams.find({"teamMembers.code": {"$exists": False}}).limit(100000)
-    print(f"获取数据: {datetime.get_duration_seconds(start_time, datetime.current_time_str())}s")
-    for item in list:
-        team_members = item["teamMembers"]
-        new_team_members = []
-        for team_member in team_members:
-            new_team_members.append(
-                {
-                    "code": f"{team_member['region']}_{team_member['realm']}_{team_member['id']}",
-                    "regionNo": team_member["region"],
-                    "realmNo": team_member["realm"],
-                    "profileNo": team_member["id"],
-                    "displayName": team_member["displayName"],
-                    "clanTag": team_member["clanTag"] if "clanTag" in team_member else None,
-                }
-            )
-        mongo_db.teams.update_one(
-            {"code": item["code"]},
-            {"$set": {"teamMembers": new_team_members}},
-        )
-    print(f"累计时间: {datetime.get_duration_seconds(start_time, datetime.current_time_str())}s")
+    for _ in range(config.getint("app", "ladderJobThreads")):
+        threading.Thread(target=ladder_task).start()

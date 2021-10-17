@@ -102,6 +102,7 @@ def get_ladder_all_teams(region_no, realm_no, profile_no, ladder):
                     "profileNo": team_member["id"],
                     "displayName": team_member["displayName"],
                     "clanTag": team_member["clanTag"] if "clanTag" in team_member else None,
+                    "favoriteRace": team_member["favoriteRace"].lower() if "favoriteRace" in team_member else None,
                 }
             )
         teams.append(
