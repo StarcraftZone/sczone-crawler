@@ -1,6 +1,6 @@
 import requests
+import traceback
 from utils import datetime
-
 from utils import config
 from utils import redis
 
@@ -26,9 +26,15 @@ def get_access_token():
 def get_api_response(path):
     url = f"https://gateway.battlenet.com.cn{path}?locale=en_US&access_token={get_access_token()}"
     response = requests.get(url)
-    response_data = response.json()
     redis.incr(f"stats:battlenet-api-request-count:{datetime.current_date_str()}")
-    return response_data
+    if response.status_code == 200:
+        response_data = response.json()
+        redis.incr(f"stats:battlenet-api-request-count:{datetime.current_date_str()}")
+        return response_data
+    elif response.status_code != 404:
+        print(f"请求出错: {url}, response: {response.status_code}, {response.text}")
+    else:
+        return None
 
 
 def get_league(localized_game_mode):
@@ -74,16 +80,17 @@ def get_valid_mmr(team):
 def get_character_all_ladders(region_no, realm_no, profile_no):
     response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/summary")
     ladders = []
-    for membership in response["allLadderMemberships"]:
-        ladders.append(
-            {
-                "code": f"{region_no}_{membership['ladderId']}",
-                "number": int(membership["ladderId"]),
-                "regionNo": region_no,
-                "league": get_league(membership["localizedGameMode"]),
-                "gameMode": get_game_mode(membership["localizedGameMode"]),
-            }
-        )
+    if response is not None:
+        for membership in response["allLadderMemberships"]:
+            ladders.append(
+                {
+                    "code": f"{region_no}_{membership['ladderId']}",
+                    "number": int(membership["ladderId"]),
+                    "regionNo": region_no,
+                    "league": get_league(membership["localizedGameMode"]),
+                    "gameMode": get_game_mode(membership["localizedGameMode"]),
+                }
+            )
     return ladders
 
 
@@ -91,32 +98,33 @@ def get_character_all_ladders(region_no, realm_no, profile_no):
 def get_ladder_all_teams(region_no, realm_no, profile_no, ladder):
     response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder['number']}")
     teams = []
-    for team in response["ladderTeams"]:
-        team_members = []
-        for team_member in team["teamMembers"]:
-            team_members.append(
+    if response is not None:
+        for team in response["ladderTeams"]:
+            team_members = []
+            for team_member in team["teamMembers"]:
+                team_members.append(
+                    {
+                        "code": f"{team_member['region']}_{team_member['realm']}_{team_member['id']}",
+                        "regionNo": team_member["region"],
+                        "realmNo": team_member["realm"],
+                        "profileNo": team_member["id"],
+                        "displayName": team_member["displayName"],
+                        "clanTag": team_member["clanTag"] if "clanTag" in team_member else None,
+                        "favoriteRace": team_member["favoriteRace"].lower() if "favoriteRace" in team_member else None,
+                    }
+                )
+            teams.append(
                 {
-                    "code": f"{team_member['region']}_{team_member['realm']}_{team_member['id']}",
-                    "regionNo": team_member["region"],
-                    "realmNo": team_member["realm"],
-                    "profileNo": team_member["id"],
-                    "displayName": team_member["displayName"],
-                    "clanTag": team_member["clanTag"] if "clanTag" in team_member else None,
-                    "favoriteRace": team_member["favoriteRace"].lower() if "favoriteRace" in team_member else None,
+                    "code": get_team_code(region_no, ladder["gameMode"], team["teamMembers"]),
+                    "ladderCode": ladder["code"],
+                    "points": team["points"],
+                    "wins": team["wins"],
+                    "losses": team["losses"],
+                    "total": team["wins"] + team["losses"],
+                    "winRate": get_rate(team["wins"], team["wins"] + team["losses"]),
+                    "mmr": get_valid_mmr(team),
+                    "joinLadderTime": datetime.get_time_from_timestamp(team["joinTimestamp"]),
+                    "teamMembers": team_members,
                 }
             )
-        teams.append(
-            {
-                "code": get_team_code(region_no, ladder["gameMode"], team["teamMembers"]),
-                "ladderCode": ladder["code"],
-                "points": team["points"],
-                "wins": team["wins"],
-                "losses": team["losses"],
-                "total": team["wins"] + team["losses"],
-                "winRate": get_rate(team["wins"], team["wins"] + team["losses"]),
-                "mmr": get_valid_mmr(team),
-                "joinLadderTime": datetime.get_time_from_timestamp(team["joinTimestamp"]),
-                "teamMembers": team_members,
-            }
-        )
     return teams
