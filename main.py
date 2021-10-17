@@ -170,10 +170,12 @@ def lock_test(i):
 if __name__ == "__main__":
     # 创建 mongo index
     mongo_db.characters.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
+    mongo_db.characters.create_index([("regionNo", pymongo.ASCENDING)], name="idx_regionNo", background=True)
     mongo_db.teams.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
     mongo_db.teams.create_index([("ladderCode", pymongo.ASCENDING)], name="idx_ladderCode", background=True)
     mongo_db.ladders.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
     mongo_db.ladders.create_index([("active", pymongo.ASCENDING)], name="idx_active", background=True)
+    mongo_db.ladders.create_index([("regionNo", pymongo.ASCENDING)], name="idx_regionNo", background=True)
 
     # 初始化数据
     # update_ladder(

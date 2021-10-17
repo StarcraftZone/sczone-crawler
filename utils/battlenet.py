@@ -1,5 +1,4 @@
 import requests
-import traceback
 from utils import datetime
 from utils import config
 from utils import redis
