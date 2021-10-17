@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime
+from utils import datetime
 
 from utils import config
 from utils import redis
@@ -18,7 +18,7 @@ def get_access_token():
         response_data = response.json()
         access_token = response_data["access_token"]
         expires_in = response_data["expires_in"]
-        redis.set("token:battlenet", access_token, expires_in)
+        redis.setex("token:battlenet", expires_in, access_token)
         print("fresh access token: " + access_token)
     return access_token
 
@@ -27,6 +27,7 @@ def get_api_response(path):
     url = f"https://gateway.battlenet.com.cn{path}?locale=en_US&access_token={get_access_token()}"
     response = requests.get(url)
     response_data = response.json()
+    redis.incr(f"stats:battlenet-api-request-count:{datetime.current_date_str()}")
     return response_data
 
 
@@ -69,10 +70,6 @@ def get_valid_mmr(team):
     return 0
 
 
-def get_time(timestamp):
-    return datetime.fromtimestamp(timestamp)
-
-
 # 获取角色下所有天梯
 def get_character_all_ladders(region_no, realm_no, profile_no):
     response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/summary")
@@ -95,6 +92,18 @@ def get_ladder_all_teams(region_no, realm_no, profile_no, ladder):
     response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder['number']}")
     teams = []
     for team in response["ladderTeams"]:
+        team_members = []
+        for team_member in team["teamMembers"]:
+            team_members.append(
+                {
+                    "code": f"{team_member['region']}_{team_member['realm']}_{team_member['id']}",
+                    "regionNo": team_member["region"],
+                    "realmNo": team_member["realm"],
+                    "profileNo": team_member["id"],
+                    "displayName": team_member["displayName"],
+                    "clanTag": team_member["clanTag"] if "clanTag" in team_member else None,
+                }
+            )
         teams.append(
             {
                 "code": get_team_code(region_no, ladder["gameMode"], team["teamMembers"]),
@@ -105,8 +114,8 @@ def get_ladder_all_teams(region_no, realm_no, profile_no, ladder):
                 "total": team["wins"] + team["losses"],
                 "winRate": get_rate(team["wins"], team["wins"] + team["losses"]),
                 "mmr": get_valid_mmr(team),
-                "joinLadderTime": get_time(team["joinTimestamp"]),
-                "teamMembers": team["teamMembers"],
+                "joinLadderTime": datetime.get_time_from_timestamp(team["joinTimestamp"]),
+                "teamMembers": team_members,
             }
         )
     return teams

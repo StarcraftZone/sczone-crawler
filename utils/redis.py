@@ -51,6 +51,7 @@ def incr(key):
 
 
 def lock(key, duration: timedelta):
+    key = f"lock:{key}"
     value = datetime.current_time_mills() + datetime.get_timedelta_mills(duration)
     status = setnx(key, value)
     if status:

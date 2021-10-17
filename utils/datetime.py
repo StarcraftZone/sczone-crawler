@@ -15,12 +15,20 @@ def current_time_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def current_date_str() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
 def get_time(time_str: str) -> datetime:
     return datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
 
 
 def get_time_str(time: datetime) -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def get_time_from_timestamp(timestamp) -> datetime:
+    return datetime.fromtimestamp(timestamp)
 
 
 def get_duration_seconds(time_start: str, time_end: str) -> int:
