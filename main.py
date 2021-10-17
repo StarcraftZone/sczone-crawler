@@ -85,7 +85,7 @@ def character_task():
             task_start_time = redis.get(constants.CHARACTER_TASK_START_TIME)
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
             print(f"character task done, duration: {task_duration_seconds}s")
-            redis.set(f"stats:duration:task:character:{datetime.current_time_str()}", task_duration_seconds)
+            redis.set(f"stats:duration:task:character:{datetime.current_time_str_short()}", task_duration_seconds)
             redis.delete(constants.CHARACTER_TASK_CURRENT_NO)
             redis.delete(constants.CHARACTER_TASK_START_TIME)
         else:
@@ -125,14 +125,17 @@ def ladder_task():
             task_start_time = redis.get(constants.LADDER_TASK_START_TIME)
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
             print(f"ladder task done, duration: {task_duration_seconds}s")
-            redis.set(f"stats:duration:task:ladder:{datetime.current_time_str()}", task_duration_seconds)
+            redis.set(f"stats:duration:task:ladder:{datetime.current_time_str_short()}", task_duration_seconds)
 
             # TODO: 将 team 更新时间早于 ladder job startTime - 3 天 的置为非活跃
             redis.delete(constants.LADDER_TASK_CURRENT_NO)
             redis.delete(constants.LADDER_TASK_START_TIME)
+
+            # 任务完成后，休息 1 分钟继续
+            threading.Timer(60, ladder_task).start()
         else:
             for ladder in ladders:
-                if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=30)):
+                if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=10)):
                     if not get_ladder_active_status(ladder):
                         mongo_db.ladders.update_one(
                             {"code": ladder["code"]}, {"$set": {"active": False, "updateTime": datetime.current_time()}}
@@ -140,8 +143,8 @@ def ladder_task():
                         redis.unlock(f"ladder:{ladder['code']}")
                         redis.delete(f"ladder:active:{ladder['code']}")
 
-        # 递归调用
-        ladder_task()
+            # 递归调用
+            ladder_task()
     except Exception:
         print(traceback.format_exc())
         # 出错后，延迟 5 秒递归，防止过快重试

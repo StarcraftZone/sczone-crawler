@@ -15,6 +15,10 @@ def current_time_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def current_time_str_short() -> str:
+    return datetime.now().strftime("%Y%m%d%H%M%S")
+
+
 def current_date_str() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
