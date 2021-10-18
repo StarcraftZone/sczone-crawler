@@ -30,7 +30,7 @@ def get_api_response(path):
         redis.incr(f"stats:battlenet-api-request-count:{datetime.current_date_str()}")
         return response_data
     elif response.status_code != 404:
-        log.info(f"请求出错: {url}, response: {response.status_code}, {response.text}")
+        log.error(f"请求出错 {response.status_code}, {response.text}, url: {url}")
     else:
         return None
 
