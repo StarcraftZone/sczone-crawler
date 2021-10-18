@@ -1,7 +1,6 @@
 import requests
-from utils import datetime
-from utils import config
-from utils import redis
+
+from utils import config, datetime, log, redis
 
 
 def get_access_token():
@@ -18,7 +17,7 @@ def get_access_token():
         access_token = response_data["access_token"]
         expires_in = response_data["expires_in"]
         redis.setex("token:battlenet", expires_in, access_token)
-        print("fresh access token: " + access_token)
+        log.info("fresh access token: " + access_token)
     return access_token
 
 
@@ -31,7 +30,7 @@ def get_api_response(path):
         redis.incr(f"stats:battlenet-api-request-count:{datetime.current_date_str()}")
         return response_data
     elif response.status_code != 404:
-        print(f"请求出错: {url}, response: {response.status_code}, {response.text}")
+        log.info(f"请求出错: {url}, response: {response.status_code}, {response.text}")
     else:
         return None
 

@@ -1,14 +1,11 @@
-import pymongo
+import json
 import threading
 import traceback
-import json
-from utils import battlenet
-from utils import redis
-from utils import datetime
-from utils import config
-from utils import keys
 from datetime import timedelta
 
+import pymongo
+
+from utils import battlenet, config, datetime, keys, log, redis
 
 mongo_client = pymongo.MongoClient("mongodb://***REMOVED***:***REMOVED***@***REMOVED***:***REMOVED***")
 mongo_db = mongo_client.yf_sczone
@@ -78,14 +75,14 @@ def character_task(region_no):
         skip = (task_index - 1) * task_size
         characters = list(mongo_db.characters.find({"regionNo": region_no}).sort("code").skip(skip).limit(task_size))
         if redis.setnx(keys.character_task_start_time(region_no), datetime.current_time_str()):
-            print(f"character task start")
+            log.info(f"character task start")
         else:
-            print(f"character task continue, skip: {skip}, limit:{task_size}")
+            log.info(f"character task continue, skip: {skip}, limit:{task_size}")
         if len(characters) == 0:
             # 执行完成
             task_start_time = redis.get(keys.character_task_start_time(region_no))
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
-            print(f"character task done, duration: {task_duration_seconds}s")
+            log.info(f"character task done, duration: {task_duration_seconds}s")
             redis.set(
                 keys.character_task_done_stats(region_no), json.dumps({"skip": skip, "duration": task_duration_seconds})
             )
@@ -93,22 +90,19 @@ def character_task(region_no):
             redis.delete(keys.character_task_start_time(region_no))
         else:
             for character in characters:
-                if redis.lock(f"character:{character['code']}", timedelta(minutes=30)):
-                    character_all_ladders = battlenet.get_character_all_ladders(
-                        character["regionNo"], character["realmNo"], character["profileNo"]
-                    )
+                character_all_ladders = battlenet.get_character_all_ladders(
+                    character["regionNo"], character["realmNo"], character["profileNo"]
+                )
 
-                    for ladder in character_all_ladders:
-                        if redis.get(f"ladder:active:{ladder['code']}") is None:
-                            # TODO: api update ladder
-                            redis.set(f"ladder:active:{ladder['code']}", "1")
-                            if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=30)):
-                                print(f"update_ladder: {ladder['code']}")
-                                update_ladder(ladder, character)
+                for ladder in character_all_ladders:
+                    if redis.setnx(f"ladder:active:{ladder['code']}", datetime.current_time_str()):
+                        # TODO: api update ladder
+                        if redis.lock(f"ladder:{ladder['code']}", timedelta(minutes=30)):
+                            update_ladder(ladder, character)
         # 递归调用
         character_task(region_no)
     except Exception:
-        print(traceback.format_exc())
+        log.info(traceback.format_exc())
         # 出错后，延迟 5 秒递归，防止过快重试
         threading.Timer(5, character_task, args=(region_no,)).start()
 
@@ -121,14 +115,14 @@ def ladder_task(region_no):
             mongo_db.ladders.find({"regionNo": region_no, "active": True}).sort("code").skip(skip).limit(task_size)
         )
         if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
-            print(f"ladder task start")
+            log.info(f"ladder task start")
         else:
-            print(f"ladder task continue, skip: {skip}, limit:{task_size}")
+            log.info(f"ladder task continue, skip: {skip}, limit:{task_size}")
         if len(ladders) == 0:
             # 执行完成
             task_start_time = redis.get(keys.ladder_task_start_time(region_no))
             task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
-            print(f"ladder task done, duration: {task_duration_seconds}s")
+            log.info(f"ladder task done, duration: {task_duration_seconds}s")
             redis.set(
                 keys.ladder_task_done_stats(region_no), json.dumps({"skip": skip, "duration": task_duration_seconds})
             )
@@ -152,7 +146,7 @@ def ladder_task(region_no):
             # 递归调用
             ladder_task(region_no)
     except Exception:
-        print(traceback.format_exc())
+        log.info(traceback.format_exc())
         # 出错后，延迟 5 秒递归，防止过快重试
         threading.Timer(5, ladder_task, args=(region_no,)).start()
 
