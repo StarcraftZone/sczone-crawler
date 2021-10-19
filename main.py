@@ -4,7 +4,7 @@ import traceback
 
 import pymongo
 
-from utils import battlenet, datetime, keys, log, redis, stats
+from utils import battlenet, datetime, keys, log, redis, stats, api
 from utils.mongo import mongo
 
 
@@ -18,14 +18,15 @@ def update_ladder(ladder_no, character):
 
     now = datetime.current_time()
     ladder["updateTime"] = now
-    ladder["active"] = True
+    ladder["active"] = 1
     update_result = mongo.ladders.update_one(
         {"code": ladder["code"]}, {"$set": ladder, "$setOnInsert": {"createTime": now}}, upsert=True
     )
     if update_result.upserted_id is not None:
         log.info(f"({character['regionNo']}) found new ladder: {ladder['number']}")
-
-    # TODO: api 更新 ladder
+        api.post("/ladder", ladder)
+    else:
+        api.put(f"/ladder/code/{ladder['code']}", ladder)
 
     for team in teams:
         now = datetime.current_time()
@@ -41,13 +42,13 @@ def update_ladder(ladder_no, character):
 def ladder_task(region_no):
     try:
         min_active_ladder_no = (
-            mongo.ladders.find({"regionNo": region_no, "active": True})
+            mongo.ladders.find({"regionNo": region_no, "active": 1})
             .sort("number", pymongo.ASCENDING)
             .limit(1)[0]["number"]
         )
 
         max_active_ladder_no = (
-            mongo.ladders.find({"regionNo": region_no, "active": True})
+            mongo.ladders.find({"regionNo": region_no, "active": 1})
             .sort("number", pymongo.DESCENDING)
             .limit(1)[0]["number"]
         )
@@ -63,10 +64,11 @@ def ladder_task(region_no):
             # 成员为空，将 ladder 置为非活跃
             update_result = mongo.ladders.update_one(
                 {"code": f"{region_no}_{current_ladder_no}"},
-                {"$set": {"active": False, "updateTime": datetime.current_time()}},
+                {"$set": {"active": 0, "updateTime": datetime.current_time()}},
             )
             if update_result.modified_count > 0:
                 log.info(f"({region_no}) inactive ladder: {current_ladder_no}")
+                api.patch(f"/ladder/code/{region_no}_{current_ladder_no}", {"active": 0})
 
             # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
             if current_ladder_no > max_active_ladder_no + 10:
@@ -87,6 +89,7 @@ def ladder_task(region_no):
                         },
                     )
 
+                    # TODO: 将 team 更新时间早于 ladder job startTime - 3 天 的置为非活跃
                     redis.delete(keys.ladder_task_current_no(region_no))
                     redis.delete(keys.ladder_task_start_time(region_no))
         else:

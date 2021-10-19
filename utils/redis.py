@@ -1,14 +1,12 @@
-import redis
-from configparser import ConfigParser
 from datetime import timedelta
-from utils import datetime
 
-config = ConfigParser()
-config.read("config.ini", "UTF-8")
+import redis
+from utils import config, datetime
+
 redis_connection = redis.Redis(
-    host=config["redis"]["host"],
-    port=config["redis"]["port"],
-    password=config["redis"]["password"],
+    host=config.redis["host"],
+    port=config.redis["port"],
+    password=config.redis["password"],
     decode_responses=True,
 )
 key_prefix = "sczone-crawler"
