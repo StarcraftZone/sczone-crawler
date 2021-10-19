@@ -1,5 +1,4 @@
 import requests
-
 from utils import config, datetime, log, redis
 
 
@@ -92,11 +91,39 @@ def get_character_all_ladders(region_no, realm_no, profile_no):
     return ladders
 
 
-# 获取指定天梯中所有队伍
-def get_ladder_all_teams(region_no, realm_no, profile_no, ladder):
-    response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder['number']}")
-    teams = []
+# 获取天梯信息（过时接口）
+def get_ladder_members(region_no, ladder_no):
+    response = get_api_response(f"/sc2/legacy/ladder/{region_no}/{ladder_no}")
+    members = []
     if response is not None:
+        for member_info in response["ladderMembers"]:
+            character = member_info["character"]
+            members.append(
+                {
+                    "code": f"{character['region']}_{character['realm']}_{character['id']}",
+                    "regionNo": character["region"],
+                    "realmNo": character["realm"],
+                    "profileNo": character["id"],
+                    "displayName": character["displayName"],
+                    "clanTag": character["clanTag"] if "clanTag" in character else None,
+                    "clanName": character["clanName"] if "clanName" in character else None,
+                }
+            )
+    return members
+
+
+# 获取指定天梯中所有队伍
+def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
+    response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder_no}")
+    teams = []
+    if response is not None and "currentLadderMembership" in response:
+        ladder = {
+            "code": f"{region_no}_{ladder_no}",
+            "number": ladder_no,
+            "regionNo": region_no,
+            "league": get_league(response["currentLadderMembership"]["localizedGameMode"]),
+            "gameMode": get_game_mode(response["currentLadderMembership"]["localizedGameMode"]),
+        }
         for team in response["ladderTeams"]:
             team_members = []
             for team_member in team["teamMembers"]:
@@ -115,6 +142,8 @@ def get_ladder_all_teams(region_no, realm_no, profile_no, ladder):
                 {
                     "code": get_team_code(region_no, ladder["gameMode"], team["teamMembers"]),
                     "ladderCode": ladder["code"],
+                    "gameMode": ladder["gameMode"],
+                    "league": ladder["league"],
                     "points": team["points"],
                     "wins": team["wins"],
                     "losses": team["losses"],
@@ -125,4 +154,5 @@ def get_ladder_all_teams(region_no, realm_no, profile_no, ladder):
                     "teamMembers": team_members,
                 }
             )
-    return teams
+        return (ladder, teams)
+    return (None, [])

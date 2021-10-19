@@ -12,50 +12,31 @@ mongo_db = mongo_client.yf_sczone
 task_size = 100
 
 
-def update_ladder(ladder, character):
+def update_ladder(ladder_no, character):
+    ladder, teams = battlenet.get_ladder_and_teams(
+        character["regionNo"], character["realmNo"], character["profileNo"], ladder_no
+    )
+
+    if ladder is None or len(teams) == 0:
+        return False
+
     now = datetime.current_time()
-    if "createTime" not in ladder:
-        ladder["createTime"] = now
     ladder["updateTime"] = now
     ladder["active"] = True
-    mongo_db.ladders.update_one({"code": ladder["code"]}, {"$set": ladder}, upsert=True)
+    mongo_db.ladders.update_one(
+        {"code": ladder["code"]}, {"$set": ladder, "$setOnInsert": {"createTime": now}}, upsert=True
+    )
     # TODO: api 更新 ladder
 
-    ladder_all_teams = battlenet.get_ladder_all_teams(
-        character["regionNo"], character["realmNo"], character["profileNo"], ladder
-    )
-    if len(ladder_all_teams) == 0:
-        return False
-    for ladder_team in ladder_all_teams:
+    for team in teams:
         now = datetime.current_time()
-        ladder_team["updateTime"] = now
+        team["updateTime"] = now
         mongo_db.teams.update_one(
-            {"code": ladder_team["code"]}, {"$set": ladder_team, "$setOnInsert": {"createTime": now}}, upsert=True
+            {"code": team["code"]}, {"$set": team, "$setOnInsert": {"createTime": now}}, upsert=True
         )
         # TODO: api 更新 team, "membersData": json.dumps(team["teamMembers"]),
         # TODO: 更新 mmr redis
-
-        for team_member in ladder_team["teamMembers"]:
-            now = datetime.current_time()
-            mongo_db.characters.update_one(
-                {"code": team_member["code"]},
-                {
-                    "$set": {
-                        "code": team_member["code"],
-                        "regionNo": team_member["regionNo"],
-                        "realmNo": team_member["realmNo"],
-                        "profileNo": team_member["profileNo"],
-                        "displayName": team_member["displayName"],
-                        "clanTag": team_member["clanTag"],
-                        "updateTime": now,
-                    },
-                    "$setOnInsert": {"createTime": now},
-                },
-                upsert=True,
-            )
-            # TODO: api 更新 Character
-
-            # TODO: api 更新 TeamCharacter
+        # TODO: api 更新 TeamCharacter
 
     return True
 
@@ -151,6 +132,75 @@ def ladder_task(region_no):
         threading.Timer(5, ladder_task, args=(region_no,)).start()
 
 
+# TODO: 添加统计时间；测试方法有效性；可以干掉 character_task 和 ladder_task 了
+def ladder_member_task(region_no):
+    min_active_ladder_no = (
+        mongo_db.ladders.find({"regionNo": region_no}).sort("number", pymongo.ASCENDING).limit(1)[0]["number"]
+    )
+    max_active_ladder_no = (
+        mongo_db.ladders.find({"regionNo": region_no}).sort("number", pymongo.DESCENDING).limit(1)[0]["number"]
+    )
+
+    if redis.setnx(keys.ladder_member_task_start_time(region_no), datetime.current_time_str()):
+        log.info(f"({region_no}) ladder_member task start")
+    if redis.setnx(keys.ladder_member_task_current_no(region_no), min_active_ladder_no):
+        current_ladder_no = min_active_ladder_no
+    else:
+        current_ladder_no = redis.incr(keys.ladder_member_task_current_no(region_no))
+
+    log.info(
+        f"({region_no}) current ladder number: {current_ladder_no}, ({min_active_ladder_no} ~ {max_active_ladder_no})"
+    )
+
+    ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
+    if len(ladder_members) == 0:
+        # 成员为空，将 ladder 置为非活跃
+        mongo_db.ladders.update_one(
+            {"code": f"{region_no}_{current_ladder_no}"},
+            {"$set": {"active": False, "updateTime": datetime.current_time()}},
+        )
+
+        # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
+        if current_ladder_no > max_active_ladder_no + 10:
+            task_start_time = redis.get(keys.ladder_member_task_start_time(region_no))
+            task_duration_seconds = datetime.get_duration_seconds(task_start_time, datetime.current_time_str())
+            log.info(
+                f"({region_no}) ladder_member task done, max_ladder_no: {max_active_ladder_no}, duration: {task_duration_seconds}s"
+            )
+            redis.set(
+                keys.ladder_member_task_done_stats(region_no),
+                json.dumps({"max_ladder_no": max_active_ladder_no, "duration": task_duration_seconds}),
+            )
+            # 任务完成
+            redis.delete(keys.ladder_member_task_current_no(region_no))
+            redis.delete(keys.ladder_member_task_start_time(region_no))
+    else:
+        update_ladder(current_ladder_no, ladder_members[0])
+
+        for ladder_member in ladder_members:
+            now = datetime.current_time()
+            mongo_db.characters.update_one(
+                {"code": ladder_member["code"]},
+                {
+                    "$set": {
+                        "code": ladder_member["code"],
+                        "regionNo": ladder_member["regionNo"],
+                        "realmNo": ladder_member["realmNo"],
+                        "profileNo": ladder_member["profileNo"],
+                        "displayName": ladder_member["displayName"],
+                        "clanTag": ladder_member["clanTag"],
+                        "clanName": ladder_member["clanName"],
+                        "updateTime": now,
+                    },
+                    "$setOnInsert": {"createTime": now},
+                },
+                upsert=True,
+            )
+            # TODO: api 更新 Character
+
+    ladder_member_task(region_no)
+
+
 if __name__ == "__main__":
     # 创建 mongo index
     mongo_db.characters.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
@@ -183,15 +233,21 @@ if __name__ == "__main__":
     # )
 
     # 启动角色轮询任务
-    for _ in range(config.getint("app", "characterJobThreads")):
-        threading.Thread(target=character_task, args=(1,)).start()
-        threading.Thread(target=character_task, args=(2,)).start()
-        threading.Thread(target=character_task, args=(3,)).start()
-        threading.Thread(target=character_task, args=(5,)).start()
+    # for _ in range(config.getint("app", "characterJobThreads")):
+    #     threading.Thread(target=character_task, args=(1,)).start()
+    #     threading.Thread(target=character_task, args=(2,)).start()
+    #     threading.Thread(target=character_task, args=(3,)).start()
+    #     threading.Thread(target=character_task, args=(5,)).start()
 
-    # 启动天梯轮询任务
-    for _ in range(config.getint("app", "ladderJobThreads")):
-        threading.Thread(target=ladder_task, args=(1,)).start()
-        threading.Thread(target=ladder_task, args=(2,)).start()
-        threading.Thread(target=ladder_task, args=(3,)).start()
-        threading.Thread(target=ladder_task, args=(5,)).start()
+    # 启动天梯轮询更新任务
+    # for _ in range(config.getint("app", "ladderJobThreads")):
+    #     threading.Thread(target=ladder_task, args=(1,)).start()
+    #     threading.Thread(target=ladder_task, args=(2,)).start()
+    #     threading.Thread(target=ladder_task, args=(3,)).start()
+    #     threading.Thread(target=ladder_task, args=(5,)).start()
+
+    # 遍历天梯成员任务
+    threading.Thread(target=ladder_member_task, args=(1,)).start()
+    threading.Thread(target=ladder_member_task, args=(2,)).start()
+    threading.Thread(target=ladder_member_task, args=(3,)).start()
+    threading.Thread(target=ladder_member_task, args=(5,)).start()
