@@ -27,10 +27,10 @@ def get_api_response(path):
     if response.status_code == 200:
         response_data = response.json()
         return response_data
-    elif response.status_code != 404:
+    elif response.status_code != 404 and response.status_code != 400:
         log.error(f"请求出错 {response.status_code}, {response.text}, url: {url}")
-    else:
-        return None
+
+    return None
 
 
 def get_league(localized_game_mode):
