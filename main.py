@@ -24,7 +24,7 @@ def update_ladder(ladder_no, character):
     )
     if update_result.upserted_id is not None:
         log.info(f"({character['regionNo']}) found new ladder: {ladder['number']}")
-    
+
     # TODO: api 更新 ladder
 
     for team in teams:
@@ -61,10 +61,12 @@ def ladder_task(region_no):
         ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
         if len(ladder_members) == 0:
             # 成员为空，将 ladder 置为非活跃
-            mongo.ladders.update_one(
+            update_result = mongo.ladders.update_one(
                 {"code": f"{region_no}_{current_ladder_no}"},
                 {"$set": {"active": False, "updateTime": datetime.current_time()}},
             )
+            if update_result.modified_count > 0:
+                log.info(f"({region_no}) inactive ladder: {current_ladder_no}")
 
             # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
             if current_ladder_no > max_active_ladder_no + 10:
