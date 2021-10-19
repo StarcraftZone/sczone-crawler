@@ -70,7 +70,7 @@ def ladder_task(region_no):
 
             # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
             if current_ladder_no > max_active_ladder_no + 10:
-                if redis.lock(keys.ladder_task_done(region_no), timedelta.seconds(10)):
+                if redis.lock(keys.ladder_task_done(region_no), timedelta(seconds=10)):
                     task_duration_seconds = datetime.get_duration_seconds(
                         redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
                     )
