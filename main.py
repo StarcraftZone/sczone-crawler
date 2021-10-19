@@ -53,8 +53,8 @@ def ladder_task(region_no):
         )
         if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
             log.info(f"({region_no}) ladder task start")
-        if redis.setnx(keys.ladder_task_current_no(region_no), min_active_ladder_no):
-            current_ladder_no = min_active_ladder_no
+        if redis.setnx(keys.ladder_task_current_no(region_no), min_active_ladder_no - 10):
+            current_ladder_no = min_active_ladder_no - 10
         else:
             current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
 
