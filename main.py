@@ -1,3 +1,4 @@
+from datetime import timedelta
 import threading
 import traceback
 
@@ -48,7 +49,6 @@ def ladder_task(region_no):
             .sort("number", pymongo.DESCENDING)
             .limit(1)[0]["number"]
         )
-        ladder_task_start_time = redis.get(keys.ladder_task_start_time(region_no))
         if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
             log.info(f"({region_no}) ladder_member task start")
         if redis.setnx(keys.ladder_task_current_no(region_no), min_active_ladder_no):
@@ -70,24 +70,25 @@ def ladder_task(region_no):
 
             # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
             if current_ladder_no > max_active_ladder_no + 10:
-                task_duration_seconds = datetime.get_duration_seconds(
-                    ladder_task_start_time, datetime.current_time_str()
-                )
-                log.info(
-                    f"({region_no}) ladder_member task done, max_ladder_no: {max_active_ladder_no}, duration: {task_duration_seconds}s"
-                )
+                if redis.lock(keys.ladder_task_done(region_no), timedelta.seconds(10)):
+                    task_duration_seconds = datetime.get_duration_seconds(
+                        redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
+                    )
+                    log.info(
+                        f"({region_no}) ladder_member task done, max_ladder_no: {max_active_ladder_no}, duration: {task_duration_seconds}s"
+                    )
 
-                stats.insert(
-                    region_no,
-                    "ladder_task",
-                    {
-                        "maxActiveLadderNo": max_active_ladder_no,
-                        "duration": task_duration_seconds,
-                    },
-                )
+                    stats.insert(
+                        region_no,
+                        "ladder_task",
+                        {
+                            "maxActiveLadderNo": max_active_ladder_no,
+                            "duration": task_duration_seconds,
+                        },
+                    )
 
-                redis.delete(keys.ladder_task_current_no(region_no))
-                redis.delete(keys.ladder_task_start_time(region_no))
+                    redis.delete(keys.ladder_task_current_no(region_no))
+                    redis.delete(keys.ladder_task_start_time(region_no))
         else:
             update_ladder(current_ladder_no, ladder_members[0])
 
