@@ -19,9 +19,12 @@ def update_ladder(ladder_no, character):
     now = datetime.current_time()
     ladder["updateTime"] = now
     ladder["active"] = True
-    mongo.ladders.update_one(
+    update_result = mongo.ladders.update_one(
         {"code": ladder["code"]}, {"$set": ladder, "$setOnInsert": {"createTime": now}}, upsert=True
     )
+    if update_result.upserted_id is not None:
+        log.info(f"({character['regionNo']}) found new ladder: {ladder['number']}")
+    
     # TODO: api 更新 ladder
 
     for team in teams:
@@ -49,7 +52,7 @@ def ladder_task(region_no):
             .limit(1)[0]["number"]
         )
         if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
-            log.info(f"({region_no}) ladder_member task start")
+            log.info(f"({region_no}) ladder task start")
         if redis.setnx(keys.ladder_task_current_no(region_no), min_active_ladder_no):
             current_ladder_no = min_active_ladder_no
         else:
@@ -70,7 +73,7 @@ def ladder_task(region_no):
                         redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
                     )
                     log.info(
-                        f"({region_no}) ladder_member task done, max_ladder_no: {max_active_ladder_no}, duration: {task_duration_seconds}s"
+                        f"({region_no}) ladder task done, max_ladder_no: {max_active_ladder_no}, duration: {task_duration_seconds}s"
                     )
 
                     stats.insert(
@@ -137,3 +140,5 @@ if __name__ == "__main__":
         threading.Thread(target=ladder_task, args=(3,)).start()
     for _ in range(4):
         threading.Thread(target=ladder_task, args=(5,)).start()
+
+    log.info("sczone crawler started")
