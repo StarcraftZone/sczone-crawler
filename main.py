@@ -35,7 +35,6 @@ def update_ladder(ladder_no, character):
     return True
 
 
-# TODO: 添加统计时间；测试方法有效性；可以干掉 character_task 和 ladder_task 了
 def ladder_task(region_no):
     try:
         min_active_ladder_no = (
@@ -128,41 +127,6 @@ if __name__ == "__main__":
     mongo.stats.create_index([("regionNo", pymongo.ASCENDING)], name="idx_regionNo", background=True)
     mongo.stats.create_index([("date", pymongo.ASCENDING)], name="idx_date", background=True)
     mongo.stats.create_index([("type", pymongo.ASCENDING)], name="idx_type", background=True)
-
-    # 初始化数据
-    # update_ladder(
-    #     {"code": "1_303247", "number": 303247, "regionNo": 1, "league": "platinum", "gameMode": "1v1"},
-    #     {"regionNo": 1, "realmNo": 1, "profileNo": 11345205},
-    # )
-
-    # update_ladder(
-    #     {"code": "2_239600", "number": 239600, "regionNo": 2, "league": "grandmaster", "gameMode": "1v1"},
-    #     {"regionNo": 2, "realmNo": 1, "profileNo": 3437681},
-    # )
-
-    # update_ladder(
-    #     {"code": "3_76612", "number": 76612, "regionNo": 3, "league": "platinum", "gameMode": "1v1"},
-    #     {"regionNo": 3, "realmNo": 1, "profileNo": 756147},
-    # )
-
-    # update_ladder(
-    #     {"code": "5_63504", "number": 63504, "regionNo": 5, "league": "master", "gameMode": "1v1"},
-    #     {"regionNo": 5, "realmNo": 1, "profileNo": 526043},
-    # )
-
-    # 启动角色轮询任务
-    # for _ in range(config.getint("app", "characterJobThreads")):
-    #     threading.Thread(target=character_task, args=(1,)).start()
-    #     threading.Thread(target=character_task, args=(2,)).start()
-    #     threading.Thread(target=character_task, args=(3,)).start()
-    #     threading.Thread(target=character_task, args=(5,)).start()
-
-    # 启动天梯轮询更新任务
-    # for _ in range(config.getint("app", "ladderJobThreads")):
-    #     threading.Thread(target=ladder_task, args=(1,)).start()
-    #     threading.Thread(target=ladder_task, args=(2,)).start()
-    #     threading.Thread(target=ladder_task, args=(3,)).start()
-    #     threading.Thread(target=ladder_task, args=(5,)).start()
 
     # 遍历天梯成员任务
     for _ in range(5):
