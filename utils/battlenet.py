@@ -1,5 +1,5 @@
 import requests
-from utils import config, datetime, log, redis
+from utils import config, datetime, log, redis, stats
 
 
 def get_access_token():
@@ -23,10 +23,9 @@ def get_access_token():
 def get_api_response(path):
     url = f"https://gateway.battlenet.com.cn{path}?locale=en_US&access_token={get_access_token()}"
     response = requests.get(url)
-    redis.incr(f"stats:battlenet-api-request-count:{datetime.current_date_str()}")
+    stats.incr(None, "battlenet-api-request", {"count": 1})
     if response.status_code == 200:
         response_data = response.json()
-        redis.incr(f"stats:battlenet-api-request-count:{datetime.current_date_str()}")
         return response_data
     elif response.status_code != 404:
         log.error(f"请求出错 {response.status_code}, {response.text}, url: {url}")
