@@ -23,7 +23,7 @@ def get_access_token():
 def get_api_response(path):
     url = f"https://gateway.battlenet.com.cn{path}?locale=en_US&access_token={get_access_token()}"
     response = requests.get(url)
-    stats.incr(None, "battlenet-api-request", {"count": 1})
+    stats.incr(None, "battlenet-api-request", {"data.count": 1})
     if response.status_code == 200:
         response_data = response.json()
         return response_data
