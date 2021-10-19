@@ -23,7 +23,7 @@ def update_ladder(ladder_no, character):
         {"code": ladder["code"]}, {"$set": ladder, "$setOnInsert": {"createTime": now}}, upsert=True
     )
     if update_result.upserted_id is not None:
-        log.info(f"({character['regionNo']}) found new ladder: {ladder['number']}")
+        log.info(f"({character['regionNo']}) found new ladder: {ladder['code']}")
         api.post("/ladder", ladder)
     else:
         api.put(f"/ladder/code/{ladder['code']}", ladder)
@@ -97,7 +97,7 @@ def ladder_task(region_no):
 
             for ladder_member in ladder_members:
                 now = datetime.current_time()
-                mongo.characters.update_one(
+                update_result = mongo.characters.update_one(
                     {"code": ladder_member["code"]},
                     {
                         "$set": {
@@ -114,7 +114,11 @@ def ladder_task(region_no):
                     },
                     upsert=True,
                 )
-                # TODO: api 更新 Character
+                if update_result.upserted_id is not None:
+                    log.info(f"({ladder_member['regionNo']}) found new character: {ladder_member['code']}")
+                    api.post("/character", ladder_member)
+                else:
+                    api.put(f"/character/code/{ladder_member['code']}", ladder_member)
 
         ladder_task(region_no)
     except:
