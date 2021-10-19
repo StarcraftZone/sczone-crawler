@@ -169,8 +169,11 @@ if __name__ == "__main__":
     #     threading.Thread(target=ladder_task, args=(5,)).start()
 
     # 遍历天梯成员任务
-    for _ in range(4):
+    for _ in range(5):
         threading.Thread(target=ladder_task, args=(1,)).start()
+    for _ in range(4):
         threading.Thread(target=ladder_task, args=(2,)).start()
+    for _ in range(1):
         threading.Thread(target=ladder_task, args=(3,)).start()
+    for _ in range(4):
         threading.Thread(target=ladder_task, args=(5,)).start()
