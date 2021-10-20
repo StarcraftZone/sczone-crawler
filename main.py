@@ -69,8 +69,6 @@ def ladder_task(region_no):
             else:
                 current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
 
-            log.info(f"({region_no}) current ladder: {current_ladder_no}")
-
             ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
             if len(ladder_members) == 0:
                 # 成员为空，将 ladder 置为非活跃
