@@ -42,3 +42,11 @@ def get_duration_seconds(time_start: str, time_end: str) -> int:
 
 def get_timedelta_mills(timedelta: timedelta) -> int:
     return round(timedelta.total_seconds() * 1000)
+
+
+def plus(time: datetime, timedelta: timedelta) -> datetime:
+    return time + timedelta
+
+
+def minus(time: datetime, timedelta: timedelta) -> datetime:
+    return time - timedelta

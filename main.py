@@ -9,7 +9,17 @@ from utils import battlenet, datetime, keys, log, redis, stats, api
 from utils.mongo import mongo
 
 
+def inactive_ladder(region_no, ladder_no):
+    update_result = mongo.ladders.update_one(
+        {"code": f"{region_no}_{ladder_no}"},
+        {"$set": {"active": 0, "updateTime": datetime.current_time()}},
+    )
+    if update_result.modified_count > 0:
+        log.info(f"({region_no}) inactive ladder: {ladder_no}")
+
+
 def update_ladder(ladder_no, character):
+    log.info(f"({character['regionNo']}) update ladder {ladder_no} by character {character['code']}")
     ladder, teams = battlenet.get_ladder_and_teams(
         character["regionNo"], character["realmNo"], character["profileNo"], ladder_no
     )
@@ -25,17 +35,15 @@ def update_ladder(ladder_no, character):
     )
     if update_result.upserted_id is not None:
         log.info(f"({character['regionNo']}) found new ladder: {ladder['code']}")
-        api.post("/ladder", ladder)
-    else:
-        api.put(f"/ladder/code/{ladder['code']}", ladder)
 
     for team in teams:
         now = datetime.current_time()
         team["updateTime"] = now
         mongo.teams.update_one({"code": team["code"]}, {"$set": team, "$setOnInsert": {"createTime": now}}, upsert=True)
-        # TODO: api 更新 team, "membersData": json.dumps(team["teamMembers"]),
-        # TODO: 更新 mmr redis
-        # TODO: api 更新 TeamCharacter
+
+    # 批量更新 api team
+    api.post(f"/team/batch", teams)
+    log.info(f"({character['regionNo']}) update ladder {ladder_no} done.")
 
     return True
 
@@ -56,21 +64,17 @@ def ladder_task(region_no):
             )
             if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
                 log.info(f"({region_no}) ladder task start")
-            if redis.setnx(keys.ladder_task_current_no(region_no), min_active_ladder_no - 10):
-                current_ladder_no = min_active_ladder_no - 10
+            if redis.setnx(keys.ladder_task_current_no(region_no), min_active_ladder_no):
+                current_ladder_no = min_active_ladder_no
             else:
                 current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
+
+            log.info(f"({region_no}) current ladder: {current_ladder_no}")
 
             ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
             if len(ladder_members) == 0:
                 # 成员为空，将 ladder 置为非活跃
-                update_result = mongo.ladders.update_one(
-                    {"code": f"{region_no}_{current_ladder_no}"},
-                    {"$set": {"active": 0, "updateTime": datetime.current_time()}},
-                )
-                if update_result.modified_count > 0:
-                    log.info(f"({region_no}) inactive ladder: {current_ladder_no}")
-                    api.patch(f"/ladder/code/{region_no}_{current_ladder_no}", {"active": 0})
+                inactive_ladder(region_no, current_ladder_no)
 
                 # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
                 if current_ladder_no > max_active_ladder_no + 10:
@@ -91,12 +95,30 @@ def ladder_task(region_no):
                             },
                         )
 
-                        # TODO: 将 team 更新时间早于 ladder job startTime - 3 天 的置为非活跃
+                        # 将当前 region 中 team 更新时间早于 ladder job startTime - 1 天且活跃的 team 置为非活跃
+                        task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
+                        teams_to_inactive = mongo.teams.find(
+                            {
+                                "regionNo": region_no,
+                                "active": 1,
+                                "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
+                            }
+                        )
+                        for team_to_inactive in teams_to_inactive:
+                            log.info(f"({region_no}) inactive team: {team_to_inactive['code']}")
+                            mongo.teams.update_one(
+                                {"code": team_to_inactive["code"]},
+                                {"$set": {"active": 0, "updateTime": datetime.current_time()}},
+                            )
+                            team_to_inactive["active"] = 0
+                            api.put(f"/team/code/{team_to_inactive['code']}", team_to_inactive)
+
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))
             else:
-                update_ladder(current_ladder_no, ladder_members[0])
-
+                # 更新 Character
+                ladder_updated = False
+                ladder_update_retry_times = 0
                 for ladder_member in ladder_members:
                     now = datetime.current_time()
                     update_result = mongo.characters.update_one(
@@ -121,6 +143,14 @@ def ladder_task(region_no):
                         api.post("/character", ladder_member)
                     else:
                         api.put(f"/character/code/{ladder_member['code']}", ladder_member)
+                    if not ladder_updated and ladder_update_retry_times < 10:
+                        # 为提升速度，只重试 10 次
+                        ladder_updated = update_ladder(current_ladder_no, ladder_member)
+                        ladder_update_retry_times += 1
+                if not ladder_updated:
+                    # 通过新方法未能获取到 ladder 信息
+                    inactive_ladder(region_no, current_ladder_no)
+                    print(f"({region_no}) legacy ladder info problem: {current_ladder_no}")
 
         except:
             log.error(traceback.format_exc())

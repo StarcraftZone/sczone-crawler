@@ -1,11 +1,12 @@
 import requests
-import json
-from utils import config, datetime, log, redis, stats
+from utils import config, datetime, log, redis, stats, json
+
+headers = {"token": config.app["apiToken"], "Content-Type": "application/json"}
 
 
 def get(path):
     url = f"{config.app['apiOrigin']}{path}"
-    response = requests.get(url, headers={"token": config.app["apiToken"]})
+    response = requests.get(url, headers=headers)
     if response.status_code == 200:
         response_data = response.json()
         return response_data
@@ -17,7 +18,7 @@ def get(path):
 
 def post(path, data):
     url = f"{config.app['apiOrigin']}{path}"
-    response = requests.post(url, data, headers={"token": config.app["apiToken"]})
+    response = requests.post(url, data=json.dumps(data), headers=headers)
     if response.status_code == 200:
         response_data = response.json()
         return response_data
@@ -29,7 +30,7 @@ def post(path, data):
 
 def put(path, data):
     url = f"{config.app['apiOrigin']}{path}"
-    response = requests.put(url, data, headers={"token": config.app["apiToken"]})
+    response = requests.put(url, data=json.dumps(data), headers=headers)
     if response.status_code == 200:
         response_data = response.json()
         return response_data
@@ -41,7 +42,7 @@ def put(path, data):
 
 def patch(path, data):
     url = f"{config.app['apiOrigin']}{path}"
-    response = requests.patch(url, data, headers={"token": config.app["apiToken"]})
+    response = requests.patch(url, data=json.dumps(data), headers=headers)
     if response.status_code == 200:
         response_data = response.json()
         return response_data

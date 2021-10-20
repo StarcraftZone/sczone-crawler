@@ -141,6 +141,7 @@ def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
                 {
                     "code": get_team_code(region_no, ladder["gameMode"], team["teamMembers"]),
                     "ladderCode": ladder["code"],
+                    "regionNo": region_no,
                     "gameMode": ladder["gameMode"],
                     "league": ladder["league"],
                     "points": team["points"],
