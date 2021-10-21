@@ -1,12 +1,12 @@
-from datetime import timedelta
 import threading
-import traceback
 import time
+import traceback
+from datetime import timedelta
 
 import pymongo
 from pymongo import UpdateOne
 
-from utils import battlenet, datetime, keys, log, redis, stats, api
+from utils import api, battlenet, datetime, keys, log, redis, stats
 from utils.mongo import mongo
 
 
@@ -22,7 +22,7 @@ def inactive_ladder(region_no, ladder_no):
 
 
 def update_ladder(ladder_no, character):
-    log.info(f"({character['regionNo']}) update ladder {ladder_no} by character {character['code']}")
+    # log.info(f"({character['regionNo']}) update ladder {ladder_no} by character {character['code']}")
     ladder, teams = battlenet.get_ladder_and_teams(
         character["regionNo"], character["realmNo"], character["profileNo"], ladder_no
     )
@@ -52,7 +52,7 @@ def update_ladder(ladder_no, character):
     if len(bulk_operations) > 0:
         mongo.teams.bulk_write(bulk_operations)
         api.post(f"/team/batch", teams)
-    log.info(f"({character['regionNo']}) update ladder {ladder_no} done.")
+    # log.info(f"({character['regionNo']}) update ladder {ladder_no} done.")
 
     return True
 
