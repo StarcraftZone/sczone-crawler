@@ -48,10 +48,10 @@ def get_game_mode(localized_game_mode):
 
 
 def get_team_code(region_no, game_mode, team_members):
-    team_members.sort(key=lambda team_member: team_member["id"])
+    team_members.sort(key=lambda team_member: team_member["profileNo"])
     result = f"{region_no}_{game_mode}"
     for team_member in team_members:
-        result += f"_{team_member['id']}"
+        result += f"_{team_member['profileNo']}"
     if game_mode == "1v1" and len(team_members) == 1 and "favoriteRace" in team_members[0]:
         result += f"_{team_members[0]['favoriteRace'].lower()}"
     return result
@@ -102,7 +102,7 @@ def get_ladder_members(region_no, ladder_no):
                     "code": f"{character['region']}_{character['realm']}_{character['id']}",
                     "regionNo": character["region"],
                     "realmNo": character["realm"],
-                    "profileNo": character["id"],
+                    "profileNo": int(character["id"]),
                     "displayName": character["displayName"],
                     "clanTag": character["clanTag"] if "clanTag" in character else None,
                     "clanName": character["clanName"] if "clanName" in character else None,
@@ -133,7 +133,7 @@ def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
                         "code": f"{team_member['region']}_{team_member['realm']}_{team_member['id']}",
                         "regionNo": team_member["region"],
                         "realmNo": team_member["realm"],
-                        "profileNo": team_member["id"],
+                        "profileNo": int(team_member["id"]),
                         "displayName": team_member["displayName"],
                         "clanTag": team_member["clanTag"] if "clanTag" in team_member else None,
                         "favoriteRace": team_member["favoriteRace"].lower() if "favoriteRace" in team_member else None,
@@ -141,7 +141,7 @@ def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
                 )
             teams.append(
                 {
-                    "code": get_team_code(region_no, ladder["gameMode"], team["teamMembers"]),
+                    "code": get_team_code(region_no, ladder["gameMode"], team_members),
                     "ladderCode": ladder["code"],
                     "regionNo": region_no,
                     "gameMode": ladder["gameMode"],
