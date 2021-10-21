@@ -102,15 +102,15 @@ def ladder_task(region_no):
 
                         # 将当前 region 中 team 更新时间早于 ladder job startTime - 1 天且活跃的 team 置为非活跃
                         task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
-                        teams_to_inactive = list(
-                            mongo.teams.find(
-                                {
-                                    "regionNo": region_no,
-                                    "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
-                                    "$or": [{"active": 1}, {"active": None}],
-                                }
-                            )
+                        teams_to_inactive = mongo.teams.find(
+                            {
+                                "regionNo": region_no,
+                                "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
+                                "$or": [{"active": 1}, {"active": None}],
+                            }
                         )
+                        teams_to_inactive_obj = []
+
                         bulk_operations = []
                         for team_to_inactive in teams_to_inactive:
                             log.info(f"({region_no}) inactive team: {team_to_inactive['code']}")
@@ -120,10 +120,27 @@ def ladder_task(region_no):
                                     {"$set": {"active": 0, "updateTime": datetime.current_time()}},
                                 )
                             )
-                            team_to_inactive["active"] = 0
+                            teams_to_inactive_obj.append(
+                                {
+                                    "code": team_to_inactive["code"],
+                                    "active": 0,
+                                    "ladderCode": team_to_inactive["ladderCode"],
+                                    "regionNo": team_to_inactive["regionNo"],
+                                    "gameMode": team_to_inactive["gameMode"],
+                                    "league": team_to_inactive["league"],
+                                    "points": team_to_inactive["points"],
+                                    "wins": team_to_inactive["wins"],
+                                    "losses": team_to_inactive["losses"],
+                                    "total": team_to_inactive["total"],
+                                    "winRate": team_to_inactive["winRate"],
+                                    "mmr": team_to_inactive["mmr"],
+                                    "joinLadderTime": team_to_inactive["joinLadderTime"],
+                                    "teamMembers": team_to_inactive["teamMembers"],
+                                }
+                            )
                         if len(bulk_operations) > 0:
                             mongo.teams.bulk_write(bulk_operations)
-                            api.post(f"/team/batch", teams_to_inactive)
+                            api.post(f"/team/batch", teams_to_inactive_obj)
 
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))

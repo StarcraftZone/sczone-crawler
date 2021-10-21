@@ -11,3 +11,7 @@ def json_serial(obj):
 
 def dumps(data):
     return json.dumps(data, default=json_serial)
+
+
+def loads(str):
+    return json.loads(str)
