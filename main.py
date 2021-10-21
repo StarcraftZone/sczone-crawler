@@ -4,18 +4,21 @@ import traceback
 import time
 
 import pymongo
+from pymongo import UpdateOne
 
 from utils import battlenet, datetime, keys, log, redis, stats, api
 from utils.mongo import mongo
 
 
 def inactive_ladder(region_no, ladder_no):
-    update_result = mongo.ladders.update_one(
-        {"code": f"{region_no}_{ladder_no}"},
-        {"$set": {"active": 0, "updateTime": datetime.current_time()}},
-    )
-    if update_result.modified_count > 0:
-        log.info(f"({region_no}) inactive ladder: {ladder_no}")
+    ladder_active_status = redis.getset(f"status:region:{region_no}:ladder:{ladder_no}:active", 0)
+    if ladder_active_status != "0":
+        update_result = mongo.ladders.update_one(
+            {"code": f"{region_no}_{ladder_no}"},
+            {"$set": {"active": 0, "updateTime": datetime.current_time()}},
+        )
+        if update_result.modified_count > 0:
+            log.info(f"({region_no}) inactive ladder: {ladder_no}")
 
 
 def update_ladder(ladder_no, character):
@@ -27,19 +30,27 @@ def update_ladder(ladder_no, character):
     if ladder is None or len(teams) == 0:
         return False
 
-    now = datetime.current_time()
-    ladder["updateTime"] = now
-    ladder["active"] = 1
-    update_result = mongo.ladders.update_one(
-        {"code": ladder["code"]}, {"$set": ladder, "$setOnInsert": {"createTime": now}}, upsert=True
-    )
-    if update_result.upserted_id is not None:
-        log.info(f"({character['regionNo']}) found new ladder: {ladder['code']}")
+    ladder_active_status = redis.getset(f"status:region:{ladder['regionNo']}:ladder:{ladder['code']}:active", 1)
+    if ladder_active_status != "1":
+        now = datetime.current_time()
+        ladder["active"] = 1
+        ladder["updateTime"] = now
+        update_result = mongo.ladders.update_one(
+            {"code": ladder["code"]}, {"$set": ladder, "$setOnInsert": {"createTime": now}}, upsert=True
+        )
+        if update_result.upserted_id is not None:
+            log.info(f"({character['regionNo']}) found new ladder: {ladder['code']}")
 
+    team_mongo_operations = []
     for team in teams:
         now = datetime.current_time()
+        team["active"] = 1
         team["updateTime"] = now
-        mongo.teams.update_one({"code": team["code"]}, {"$set": team, "$setOnInsert": {"createTime": now}}, upsert=True)
+        team_mongo_operations.append(
+            UpdateOne({"code": team["code"]}, {"$set": team, "$setOnInsert": {"createTime": now}}, upsert=True)
+        )
+
+    mongo.teams.bulk_write(team_mongo_operations)
 
     # 批量更新 api team
     api.post(f"/team/batch", teams)
@@ -52,9 +63,7 @@ def ladder_task(region_no):
     while True:
         try:
             min_active_ladder_no = (
-                mongo.ladders.find({"regionNo": region_no, "active": 1})
-                .sort("number", pymongo.ASCENDING)
-                .limit(1)[0]["number"]
+                mongo.ladders.find({"regionNo": region_no, "active": 1}).sort("number", 1).limit(1)[0]["number"]
             )
 
             max_active_ladder_no = (
@@ -98,18 +107,23 @@ def ladder_task(region_no):
                         teams_to_inactive = mongo.teams.find(
                             {
                                 "regionNo": region_no,
-                                "active": 1,
                                 "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
+                                "$or": [{"active": 1}, {"active": None}],
                             }
                         )
+                        bulk_operations = []
                         for team_to_inactive in teams_to_inactive:
                             log.info(f"({region_no}) inactive team: {team_to_inactive['code']}")
-                            mongo.teams.update_one(
-                                {"code": team_to_inactive["code"]},
-                                {"$set": {"active": 0, "updateTime": datetime.current_time()}},
+                            bulk_operations.append(
+                                UpdateOne(
+                                    {"code": team_to_inactive["code"]},
+                                    {"$set": {"active": 0, "updateTime": datetime.current_time()}},
+                                )
                             )
                             team_to_inactive["active"] = 0
-                            api.put(f"/team/code/{team_to_inactive['code']}", team_to_inactive)
+
+                        mongo.teams.bulk_write(bulk_operations)
+                        api.post(f"/team/batch", teams_to_inactive)
 
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))
@@ -117,34 +131,37 @@ def ladder_task(region_no):
                 # 更新 Character
                 ladder_updated = False
                 ladder_update_retry_times = 0
+                bulk_operations = []
                 for ladder_member in ladder_members:
                     now = datetime.current_time()
-                    update_result = mongo.characters.update_one(
-                        {"code": ladder_member["code"]},
-                        {
-                            "$set": {
-                                "code": ladder_member["code"],
-                                "regionNo": ladder_member["regionNo"],
-                                "realmNo": ladder_member["realmNo"],
-                                "profileNo": ladder_member["profileNo"],
-                                "displayName": ladder_member["displayName"],
-                                "clanTag": ladder_member["clanTag"],
-                                "clanName": ladder_member["clanName"],
-                                "updateTime": now,
+                    bulk_operations.append(
+                        UpdateOne(
+                            {"code": ladder_member["code"]},
+                            {
+                                "$set": {
+                                    "code": ladder_member["code"],
+                                    "regionNo": ladder_member["regionNo"],
+                                    "realmNo": ladder_member["realmNo"],
+                                    "profileNo": ladder_member["profileNo"],
+                                    "displayName": ladder_member["displayName"],
+                                    "clanTag": ladder_member["clanTag"],
+                                    "clanName": ladder_member["clanName"],
+                                    "updateTime": now,
+                                },
+                                "$setOnInsert": {"createTime": now},
                             },
-                            "$setOnInsert": {"createTime": now},
-                        },
-                        upsert=True,
+                            upsert=True,
+                        )
                     )
-                    if update_result.upserted_id is not None:
-                        log.info(f"({ladder_member['regionNo']}) found new character: {ladder_member['code']}")
-                        api.post("/character", ladder_member)
-                    else:
-                        api.put(f"/character/code/{ladder_member['code']}", ladder_member)
+
                     if not ladder_updated and ladder_update_retry_times < 10:
                         # 为提升速度，只重试 10 次
                         ladder_updated = update_ladder(current_ladder_no, ladder_member)
                         ladder_update_retry_times += 1
+
+                mongo.characters.bulk_write(bulk_operations)
+                api.post("/character/batch", ladder_members)
+
                 if not ladder_updated:
                     # 通过新方法未能获取到 ladder 信息
                     inactive_ladder(region_no, current_ladder_no)
@@ -158,16 +175,22 @@ def ladder_task(region_no):
 
 if __name__ == "__main__":
     # 创建 mongo index
-    mongo.characters.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
-    mongo.characters.create_index([("regionNo", pymongo.ASCENDING)], name="idx_regionNo", background=True)
-    mongo.teams.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
-    mongo.teams.create_index([("ladderCode", pymongo.ASCENDING)], name="idx_ladderCode", background=True)
-    mongo.ladders.create_index([("code", pymongo.ASCENDING)], name="idx_code", unique=True, background=True)
-    mongo.ladders.create_index([("active", pymongo.ASCENDING)], name="idx_active", background=True)
-    mongo.ladders.create_index([("regionNo", pymongo.ASCENDING)], name="idx_regionNo", background=True)
-    mongo.stats.create_index([("regionNo", pymongo.ASCENDING)], name="idx_regionNo", background=True)
-    mongo.stats.create_index([("date", pymongo.ASCENDING)], name="idx_date", background=True)
-    mongo.stats.create_index([("type", pymongo.ASCENDING)], name="idx_type", background=True)
+    mongo.characters.create_index([("code", 1)], name="idx_code", unique=True, background=True)
+    mongo.characters.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
+    mongo.teams.create_index([("code", 1)], name="idx_code", unique=True, background=True)
+    mongo.teams.create_index([("ladderCode", 1)], name="idx_ladderCode", background=True)
+    mongo.teams.create_index([("active", 1)], name="idx_active", background=True)
+    mongo.teams.create_index(
+        [("regionNo", 1), ("active", 1), ("updateTime", 1)],
+        name="idx_inactive",
+        background=True,
+    )
+    mongo.ladders.create_index([("code", 1)], name="idx_code", unique=True, background=True)
+    mongo.ladders.create_index([("active", 1)], name="idx_active", background=True)
+    mongo.ladders.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
+    mongo.stats.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
+    mongo.stats.create_index([("date", 1)], name="idx_date", background=True)
+    mongo.stats.create_index([("type", 1)], name="idx_type", background=True)
 
     # 遍历天梯成员任务
     for _ in range(5):
