@@ -49,7 +49,7 @@ def update_ladder(ladder_no, character):
         bulk_operations.append(
             UpdateOne({"code": team["code"]}, {"$set": team, "$setOnInsert": {"createTime": now}}, upsert=True)
         )
-    if len(teams) > 0:
+    if len(bulk_operations) > 0:
         mongo.teams.bulk_write(bulk_operations)
         api.post(f"/team/batch", teams)
     log.info(f"({character['regionNo']}) update ladder {ladder_no} done.")
@@ -119,7 +119,7 @@ def ladder_task(region_no):
                                 )
                             )
                             team_to_inactive["active"] = 0
-                        if len(teams_to_inactive) > 0:
+                        if len(bulk_operations) > 0:
                             mongo.teams.bulk_write(bulk_operations)
                             api.post(f"/team/batch", teams_to_inactive)
 
@@ -156,7 +156,7 @@ def ladder_task(region_no):
                         # 为提升速度，只重试 10 次
                         ladder_updated = update_ladder(current_ladder_no, ladder_member)
                         ladder_update_retry_times += 1
-                if len(ladder_members) > 0:
+                if len(bulk_operations) > 0:
                     mongo.characters.bulk_write(bulk_operations)
                     api.post("/character/batch", ladder_members)
 
