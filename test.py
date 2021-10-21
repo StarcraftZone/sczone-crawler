@@ -36,5 +36,5 @@ for team in teams:
         }
     )
 
-# print(teams_to_inactive)
+print(len(teams_to_inactive))
 api.post(f"/team/batch", teams_to_inactive)
