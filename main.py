@@ -102,12 +102,14 @@ def ladder_task(region_no):
 
                         # 将当前 region 中 team 更新时间早于 ladder job startTime - 1 天且活跃的 team 置为非活跃
                         task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
-                        teams_to_inactive = mongo.teams.find(
-                            {
-                                "regionNo": region_no,
-                                "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
-                                "$or": [{"active": 1}, {"active": None}],
-                            }
+                        teams_to_inactive = list(
+                            mongo.teams.find(
+                                {
+                                    "regionNo": region_no,
+                                    "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
+                                    "$or": [{"active": 1}, {"active": None}],
+                                }
+                            )
                         )
                         bulk_operations = []
                         for team_to_inactive in teams_to_inactive:
@@ -121,7 +123,7 @@ def ladder_task(region_no):
                             team_to_inactive["active"] = 0
                         if len(bulk_operations) > 0:
                             mongo.teams.bulk_write(bulk_operations)
-                            api.post(f"/team/batch", list(teams_to_inactive))
+                            api.post(f"/team/batch", teams_to_inactive)
 
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))
