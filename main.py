@@ -121,7 +121,7 @@ def ladder_task(region_no):
                             team_to_inactive["active"] = 0
                         if len(bulk_operations) > 0:
                             mongo.teams.bulk_write(bulk_operations)
-                            api.post(f"/team/batch", teams_to_inactive)
+                            api.post(f"/team/batch", list(teams_to_inactive))
 
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))
