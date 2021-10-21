@@ -41,19 +41,17 @@ def update_ladder(ladder_no, character):
         if update_result.upserted_id is not None:
             log.info(f"({character['regionNo']}) found new ladder: {ladder['code']}")
 
-    team_mongo_operations = []
+    bulk_operations = []
     for team in teams:
         now = datetime.current_time()
         team["active"] = 1
         team["updateTime"] = now
-        team_mongo_operations.append(
+        bulk_operations.append(
             UpdateOne({"code": team["code"]}, {"$set": team, "$setOnInsert": {"createTime": now}}, upsert=True)
         )
-
-    mongo.teams.bulk_write(team_mongo_operations)
-
-    # 批量更新 api team
-    api.post(f"/team/batch", teams)
+    if len(teams) > 0:
+        mongo.teams.bulk_write(bulk_operations)
+        api.post(f"/team/batch", teams)
     log.info(f"({character['regionNo']}) update ladder {ladder_no} done.")
 
     return True
@@ -121,9 +119,9 @@ def ladder_task(region_no):
                                 )
                             )
                             team_to_inactive["active"] = 0
-
-                        mongo.teams.bulk_write(bulk_operations)
-                        api.post(f"/team/batch", teams_to_inactive)
+                        if len(teams_to_inactive) > 0:
+                            mongo.teams.bulk_write(bulk_operations)
+                            api.post(f"/team/batch", teams_to_inactive)
 
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))
@@ -158,9 +156,9 @@ def ladder_task(region_no):
                         # 为提升速度，只重试 10 次
                         ladder_updated = update_ladder(current_ladder_no, ladder_member)
                         ladder_update_retry_times += 1
-
-                mongo.characters.bulk_write(bulk_operations)
-                api.post("/character/batch", ladder_members)
+                if len(ladder_members) > 0:
+                    mongo.characters.bulk_write(bulk_operations)
+                    api.post("/character/batch", ladder_members)
 
                 if not ladder_updated:
                     # 通过新方法未能获取到 ladder 信息
