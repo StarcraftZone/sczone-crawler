@@ -124,6 +124,8 @@ def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
             "gameMode": get_game_mode(response["currentLadderMembership"]["localizedGameMode"]),
         }
         for team in response["ladderTeams"]:
+            if get_valid_mmr(team) <= 0:
+                continue
             team_members = []
             for team_member in team["teamMembers"]:
                 team_members.append(
