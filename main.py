@@ -13,12 +13,36 @@ from utils.mongo import mongo
 def inactive_ladder(region_no, ladder_no):
     ladder_active_status = redis.getset(f"status:region:{region_no}:ladder:{ladder_no}:active", 0)
     if ladder_active_status != "0":
+        ladder_code = f"{region_no}_{ladder_no}"
         update_result = mongo.ladders.update_one(
-            {"code": f"{region_no}_{ladder_no}"},
+            {"code": ladder_code},
             {"$set": {"active": 0, "updateTime": datetime.current_time()}},
         )
         if update_result.modified_count > 0:
+            ladder = mongo.ladders.find_one({"code": ladder_code})
             log.info(f"({region_no}) inactive ladder: {ladder_no}")
+            teams = mongo.teams.find({"ladderCode": ladder_code, "active": 1})
+            inactive_teams(region_no, ladder["gameMode"], teams)
+
+
+def inactive_teams(region_no, game_mode, teams):
+    team_codes = []
+    bulk_operations = []
+    for team in teams:
+        log.info(f"({region_no}) inactive team: {team['code']}")
+        bulk_operations.append(
+            UpdateOne(
+                {"code": team["code"]},
+                {"$set": {"active": 0}},
+            )
+        )
+        team_codes.append(team["code"])
+    if len(bulk_operations) > 0:
+        mongo.teams.bulk_write(bulk_operations)
+        api.post(
+            f"/team/batch/inactive",
+            {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes},
+        )
 
 
 def update_ladder(ladder_no, character):
@@ -116,28 +140,11 @@ def ladder_task(region_no):
                                     "regionNo": region_no,
                                     "gameMode": game_mode,
                                     "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
-                                    "$or": [{"active": 1}, {"active": None}],
+                                    "active": 1,
                                 }
                             ).limit(10000)
 
-                            team_codes_to_inactive = []
-
-                            bulk_operations = []
-                            for team_to_inactive in teams_to_inactive:
-                                log.info(f"({region_no}) inactive team: {team_to_inactive['code']}")
-                                bulk_operations.append(
-                                    UpdateOne(
-                                        {"code": team_to_inactive["code"]},
-                                        {"$set": {"active": 0}},
-                                    )
-                                )
-                                team_codes_to_inactive.append(team_to_inactive["code"])
-                            if len(bulk_operations) > 0:
-                                mongo.teams.bulk_write(bulk_operations)
-                                api.post(
-                                    f"/team/batch/inactive",
-                                    {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes_to_inactive},
-                                )
+                            inactive_teams(region_no, game_mode, teams_to_inactive)
 
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))
