@@ -1,5 +1,9 @@
+import time
+import traceback
+
 import requests
-from utils import config, datetime, log, redis, stats
+
+from utils import config, datetime, keys, log, redis
 
 
 def get_access_token():
@@ -23,13 +27,17 @@ def get_access_token():
 def get_api_response(path):
     url = f"https://gateway.battlenet.com.cn{path}?locale=en_US&access_token={get_access_token()}"
     response = requests.get(url)
-    stats.incr(None, "battlenet-api-request", {"data.count": 1})
-    if response.status_code == 200:
-        response_data = response.json()
-        return response_data
-    elif response.status_code != 404 and response.status_code != 400:
-        log.error(f"请求出错 {response.status_code}, {response.text}, url: {url}")
-
+    redis.incr(keys.stats_battlenet_api_request())
+    try:
+        if response.status_code == 200:
+            response_data = response.json()
+            return response_data
+        elif response.status_code != 404 and response.status_code != 400:
+            log.error(f"请求出错 {response.status_code}, {response.text}, url: {url}")
+    except:
+        log.error(f"请求出错:")
+        log.error(traceback.format_exc())
+        time.sleep(10)
     return None
 
 

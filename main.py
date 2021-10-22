@@ -22,7 +22,6 @@ def inactive_ladder(region_no, ladder_no):
 
 
 def update_ladder(ladder_no, character):
-    # log.info(f"({character['regionNo']}) update ladder {ladder_no} by character {character['code']}")
     ladder, teams = battlenet.get_ladder_and_teams(
         character["regionNo"], character["realmNo"], character["profileNo"], ladder_no
     )
@@ -52,7 +51,6 @@ def update_ladder(ladder_no, character):
     if len(bulk_operations) > 0:
         mongo.teams.bulk_write(bulk_operations)
         api.post(f"/team/batch", teams)
-    # log.info(f"({character['regionNo']}) update ladder {ladder_no} done.")
 
     return True
 
