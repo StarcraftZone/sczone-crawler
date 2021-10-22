@@ -82,6 +82,7 @@ def ladder_task(region_no):
                 # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
                 if current_ladder_no > max_active_ladder_no + 10:
                     if redis.lock(keys.ladder_task_done(region_no), timedelta(minutes=1)):
+                        log.info(f"({region_no}) ladder task done get lock")
                         task_duration_seconds = datetime.get_duration_seconds(
                             redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
                         )
@@ -100,48 +101,49 @@ def ladder_task(region_no):
 
                         # 将当前 region 中 team 更新时间早于 ladder job startTime - 1 天且活跃的 team 置为非活跃
                         task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
-                        teams_to_inactive = mongo.teams.find(
-                            {
-                                "regionNo": region_no,
-                                "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
-                                "$or": [{"active": 1}, {"active": None}],
-                            }
-                        )
-                        teams_to_inactive_obj = []
-
-                        bulk_operations = []
-                        for team_to_inactive in teams_to_inactive:
-                            log.info(f"({region_no}) inactive team: {team_to_inactive['code']}")
-                            bulk_operations.append(
-                                UpdateOne(
-                                    {"code": team_to_inactive["code"]},
-                                    {"$set": {"active": 0, "updateTime": datetime.current_time()}},
-                                )
-                            )
-                            teams_to_inactive_obj.append(
+                        for game_mode in [
+                            "1v1",
+                            "2v2",
+                            "3v3",
+                            "4v4",
+                            "2v2_random",
+                            "3v3_random",
+                            "4v4_random",
+                            "archon",
+                        ]:
+                            teams_to_inactive = mongo.teams.find(
                                 {
-                                    "code": team_to_inactive["code"],
-                                    "active": 0,
-                                    "ladderCode": team_to_inactive["ladderCode"],
-                                    "regionNo": team_to_inactive["regionNo"],
-                                    "gameMode": team_to_inactive["gameMode"],
-                                    "league": team_to_inactive["league"],
-                                    "points": team_to_inactive["points"],
-                                    "wins": team_to_inactive["wins"],
-                                    "losses": team_to_inactive["losses"],
-                                    "total": team_to_inactive["total"],
-                                    "winRate": team_to_inactive["winRate"],
-                                    "mmr": team_to_inactive["mmr"],
-                                    "joinLadderTime": team_to_inactive["joinLadderTime"],
-                                    "teamMembers": team_to_inactive["teamMembers"],
+                                    "regionNo": region_no,
+                                    "gameMode": game_mode,
+                                    "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
+                                    "$or": [{"active": 1}, {"active": None}],
                                 }
-                            )
-                        if len(bulk_operations) > 0:
-                            mongo.teams.bulk_write(bulk_operations)
-                            api.post(f"/team/batch", teams_to_inactive_obj)
+                            ).limit(10000)
+
+                            team_codes_to_inactive = []
+
+                            bulk_operations = []
+                            for team_to_inactive in teams_to_inactive:
+                                log.info(f"({region_no}) inactive team: {team_to_inactive['code']}")
+                                bulk_operations.append(
+                                    UpdateOne(
+                                        {"code": team_to_inactive["code"]},
+                                        {"$set": {"active": 0}},
+                                    )
+                                )
+                                team_codes_to_inactive.append(team_to_inactive["code"])
+                            if len(bulk_operations) > 0:
+                                mongo.teams.bulk_write(bulk_operations)
+                                api.post(
+                                    f"/team/batch/inactive",
+                                    {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes_to_inactive},
+                                )
 
                         redis.delete(keys.ladder_task_current_no(region_no))
                         redis.delete(keys.ladder_task_start_time(region_no))
+                        log.info(f"({region_no}) ladder task done success")
+                    else:
+                        time.sleep(60)
             else:
                 # 更新 Character
                 ladder_updated = False
