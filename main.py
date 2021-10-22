@@ -184,7 +184,11 @@ def ladder_task(region_no):
                         ladder_update_retry_times += 1
                 if len(bulk_operations) > 0:
                     mongo.characters.bulk_write(bulk_operations)
-                    api.post("/character/batch", ladder_members)
+                    try:
+                        api.post("/character/batch", ladder_members)
+                    except:
+                        log.error(f"api character batch error, ladder members count: {len(ladder_members)}")
+                        time.sleep(60)
 
                 if not ladder_updated:
                     # 通过新方法未能获取到 ladder 信息

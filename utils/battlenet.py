@@ -26,9 +26,9 @@ def get_access_token():
 
 def get_api_response(path):
     url = f"https://gateway.battlenet.com.cn{path}?locale=en_US&access_token={get_access_token()}"
-    response = requests.get(url)
     redis.incr(keys.stats_battlenet_api_request())
     try:
+        response = requests.get(url)
         if response.status_code == 200:
             response_data = response.json()
             return response_data
