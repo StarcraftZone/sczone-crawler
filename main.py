@@ -210,13 +210,13 @@ if __name__ == "__main__":
     mongo.stats.create_index([("type", 1)], name="idx_type", background=True)
 
     # 遍历天梯成员任务
-    for _ in range(5):
+    for _ in range(3):
         threading.Thread(target=ladder_task, args=(1,)).start()
-    for _ in range(4):
+    for _ in range(3):
         threading.Thread(target=ladder_task, args=(2,)).start()
     for _ in range(1):
         threading.Thread(target=ladder_task, args=(3,)).start()
-    for _ in range(4):
+    for _ in range(3):
         threading.Thread(target=ladder_task, args=(5,)).start()
 
     log.info("sczone crawler started")
