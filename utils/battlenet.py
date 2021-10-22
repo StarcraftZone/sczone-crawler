@@ -56,7 +56,7 @@ def get_game_mode(localized_game_mode):
 
 
 def get_team_code(region_no, game_mode, team_members):
-    team_members.sort(key=lambda team_member: team_member["profileNo"])
+    team_members.sort(key=lambda team_member: int(team_member["profileNo"]))
     result = f"{region_no}_{game_mode}"
     for team_member in team_members:
         result += f"_{team_member['profileNo']}"

@@ -1,4 +1,4 @@
-from utils import api, json, redis, mongo, battlenet
+from utils import api, json, redis, mongo, battlenet, log
 from pymongo import UpdateOne
 from bson import json_util
 
@@ -14,27 +14,28 @@ from bson import json_util
 # ]
 # mongo.mongo.test.bulk_write(operations)
 
-teams_to_inactive = []
-teams = mongo.mongo.teams.find({"active": 0}).limit(1000000)
-for team in teams:
-    teams_to_inactive.append(
-        {
-            "code": team["code"],
-            "active": 0,
-            "ladderCode": team["ladderCode"],
-            "regionNo": team["regionNo"],
-            "gameMode": team["gameMode"],
-            "league": team["league"],
-            "points": team["points"],
-            "wins": team["wins"],
-            "losses": team["losses"],
-            "total": team["total"],
-            "winRate": team["winRate"],
-            "mmr": team["mmr"],
-            "joinLadderTime": team["joinLadderTime"],
-            "teamMembers": team["teamMembers"],
-        }
-    )
+# team_codes_to_inactive = []
+# for region_no in [1, 2, 3, 5]:
+#     for game_mode in [
+#         "1v1",
+#         "2v2",
+#         "3v3",
+#         "4v4",
+#         "2v2_random",
+#         "3v3_random",
+#         "4v4_random",
+#         "archon",
+#     ]:
+#         teams = mongo.mongo.teams.find({"active": 0, "regionNo": region_no, "gameMode": game_mode}).limit(1000000)
+#         for team in teams:
+#             team_codes_to_inactive.append(team["code"])
 
-print(len(teams_to_inactive))
-api.post(f"/team/batch", teams_to_inactive)
+# print(len(team_codes_to_inactive))
+# api.post(f"/team/batch", {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes_to_inactive})
+
+log.info("start")
+teams = mongo.mongo.teams.find({}).limit(1000000)
+for team in teams:
+    if team["code"] != battlenet.get_team_code(team["regionNo"], team["gameMode"], team["teamMembers"]):
+        mongo.mongo.teams.delete_one({"code": team["code"]})
+log.info("end")
