@@ -231,7 +231,7 @@ if __name__ == "__main__":
 
     region_no_list = []
     for region_no in [1, 2, 3, 5]:
-        for _ in range(round(mongo.ladders.find({"regionNo": region_no, "active": 1}).count() / 100)):
+        for _ in range(round(mongo.ladders.count_documents({"regionNo": region_no, "active": 1}) / 100)):
             region_no_list.append(region_no)
 
     # 遍历天梯成员任务
