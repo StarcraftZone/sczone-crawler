@@ -231,10 +231,10 @@ if __name__ == "__main__":
 
     region_no_list = []
     for region_no in [1, 2, 3, 5]:
-        for _ in mongo.ladders.find({"regionNo": region_no, "active": 1}).count():
+        for _ in round(mongo.ladders.find({"regionNo": region_no, "active": 1}).count() / 100):
             region_no_list.append(region_no)
 
     # 遍历天梯成员任务
     for _ in range(10):
         Thread(target=ladder_task, args=(region_no_list,)).start()
-    log.info(f"sczone crawler started, ladders count: {len(region_no_list)}")
+    log.info("sczone crawler started")
