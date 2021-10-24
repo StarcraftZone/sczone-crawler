@@ -1,4 +1,4 @@
-import threading
+from threading import Thread, Lock
 import time
 import traceback
 from datetime import timedelta
@@ -8,6 +8,9 @@ from pymongo import UpdateOne
 
 from utils import api, battlenet, datetime, keys, log, redis, stats
 from utils.mongo import mongo
+
+task_index = 0
+lock = Lock()
 
 
 def inactive_ladder(region_no, ladder_no):
@@ -79,9 +82,15 @@ def update_ladder(ladder_no, character):
     return True
 
 
-def ladder_task(region_no):
+def ladder_task(region_no_list):
     while True:
         try:
+            global task_index
+            with lock:
+                if task_index >= len(region_no_list):
+                    task_index = 0
+                region_no = region_no_list[task_index]
+                task_index += 1
             min_active_ladder_no = (
                 mongo.ladders.find({"regionNo": region_no, "active": 1}).sort("number", 1).limit(1)[0]["number"]
             )
@@ -220,14 +229,12 @@ if __name__ == "__main__":
     mongo.stats.create_index([("date", 1)], name="idx_date", background=True)
     mongo.stats.create_index([("type", 1)], name="idx_type", background=True)
 
-    # 遍历天梯成员任务
-    for _ in range(3):
-        threading.Thread(target=ladder_task, args=(1,)).start()
-    for _ in range(3):
-        threading.Thread(target=ladder_task, args=(2,)).start()
-    for _ in range(1):
-        threading.Thread(target=ladder_task, args=(3,)).start()
-    for _ in range(3):
-        threading.Thread(target=ladder_task, args=(5,)).start()
+    region_no_list = []
+    for region_no in [1, 2, 3, 5]:
+        for _ in mongo.ladders.find({"regionNo": region_no, "active": 1}).count():
+            region_no_list.append(region_no)
 
-    log.info("sczone crawler started")
+    # 遍历天梯成员任务
+    for _ in range(10):
+        Thread(target=ladder_task, args=(region_no_list,)).start()
+    log.info(f"sczone crawler started, ladders count: {len(region_no_list)}")

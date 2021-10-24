@@ -1,6 +1,8 @@
 from utils import api, json, redis, mongo, battlenet, log
 from pymongo import UpdateOne
 from bson import json_util
+from threading import Thread, Lock
+import time
 
 # data = api.get_api_response("/ladder/1")
 # print(json.dumps(data))
@@ -33,9 +35,26 @@ from bson import json_util
 # print(len(team_codes_to_inactive))
 # api.post(f"/team/batch", {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes_to_inactive})
 
-log.info("start")
-teams = mongo.mongo.teams.find({}).limit(1000000)
-for team in teams:
-    if team["code"] != battlenet.get_team_code(team["regionNo"], team["gameMode"], team["teamMembers"]):
-        mongo.mongo.teams.delete_one({"code": team["code"]})
-log.info("end")
+# log.info("start")
+# teams = mongo.mongo.teams.find({}).limit(1000000)
+# for team in teams:
+#     if team["code"] != battlenet.get_team_code(team["regionNo"], team["gameMode"], team["teamMembers"]):
+#         mongo.mongo.teams.delete_one({"code": team["code"]})
+# log.info("end")
+
+index = 0
+lock = Lock()
+
+
+def test(i):
+    global index
+    with lock:
+        index = index + 1
+        print(i, index)
+    if index < 50:
+        time.sleep(0.1)
+        test(i)
+
+
+for i in range(10):
+    Thread(target=test, args=(i,)).start()
