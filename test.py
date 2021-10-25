@@ -42,19 +42,22 @@ import time
 #         mongo.mongo.teams.delete_one({"code": team["code"]})
 # log.info("end")
 
-index = 0
-lock = Lock()
+# index = 0
+# lock = Lock()
 
 
-def test(i):
-    global index
-    with lock:
-        index = index + 1
-        print(i, index)
-    if index < 50:
-        time.sleep(0.1)
-        test(i)
+# def test(i):
+#     global index
+#     with lock:
+#         index = index + 1
+#         print(i, index)
+#     if index < 50:
+#         time.sleep(0.1)
+#         test(i)
 
 
-for i in range(10):
-    Thread(target=test, args=(i,)).start()
+# for i in range(10):
+#     Thread(target=test, args=(i,)).start()
+
+season_info = battlenet.get_season_info(5)
+print(season_info)

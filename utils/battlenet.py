@@ -5,6 +5,13 @@ import requests
 
 from utils import config, datetime, keys, log, redis
 
+origins = {
+    1: "https://us.api.blizzard.com",
+    2: "https://eu.api.blizzard.com",
+    3: "https://kr.api.blizzard.com",
+    5: "https://gateway.battlenet.com.cn",
+}
+
 
 def get_access_token():
     access_token = redis.get("token:battlenet")
@@ -24,8 +31,8 @@ def get_access_token():
     return access_token
 
 
-def get_api_response(path):
-    url = f"https://gateway.battlenet.com.cn{path}?locale=en_US&access_token={get_access_token()}"
+def get_api_response(path, region_no=5):
+    url = f"{origins[region_no]}{path}?locale=en_US&access_token={get_access_token()}"
     redis.incr(keys.stats_battlenet_api_request())
     try:
         response = requests.get(url)
@@ -39,6 +46,20 @@ def get_api_response(path):
         log.error(traceback.format_exc())
         time.sleep(10)
     return None
+
+
+def get_season_info(region_no):
+    response = get_api_response(f"/sc2/ladder/season/{region_no}")
+    season = {
+        "code": f"{region_no}_{response['seasonId']}",
+        "regionNo": region_no,
+        "number": response["seasonId"],
+        "year": response["year"],
+        "yearIndexNo": response["number"],
+        "startTime": datetime.get_time_from_timestamp(response["startDate"]),
+        "endTime": datetime.get_time_from_timestamp(response["endDate"]),
+    }
+    return season
 
 
 def get_league(localized_game_mode):

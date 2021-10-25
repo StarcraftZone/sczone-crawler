@@ -31,8 +31,8 @@ def get_time_str(time: datetime) -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def get_time_from_timestamp(timestamp) -> datetime:
-    return datetime.fromtimestamp(timestamp)
+def get_time_from_timestamp(timestamp: int) -> datetime:
+    return datetime.fromtimestamp(int(timestamp))
 
 
 def get_duration_seconds(time_start: str, time_end: str) -> int:
