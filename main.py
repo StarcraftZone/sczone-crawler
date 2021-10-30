@@ -206,7 +206,7 @@ def ladder_task(region_no_list):
                 if not ladder_updated:
                     # 通过新方法未能获取到 ladder 信息
                     inactive_ladder(region_no, current_ladder_no)
-                    print(f"({region_no}) legacy ladder info problem: {current_ladder_no}")
+                    log.info(f"({region_no}) legacy ladder info problem: {current_ladder_no}")
 
         except:
             log.error(traceback.format_exc())
