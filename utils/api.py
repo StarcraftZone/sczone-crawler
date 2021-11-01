@@ -18,10 +18,10 @@ def request(method, path, data=None):
         if response_data["code"] == 0:
             return response_data["data"]
         else:
-            log.error(f"请求出错: {url}, code: {response_data['code']}, response: {response.text}")
+            log.error(f"请求出错: {method} {url}, code: {response_data['code']}, response: {response.text}")
             return None
     else:
-        log.error(f"请求出错: {url}, status code: {response.status_code}, response: {response.text}")
+        log.error(f"请求出错: {method} {url}, status code: {response.status_code}, response: {response.text}")
         return None
 
 

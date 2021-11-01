@@ -40,7 +40,7 @@ def get_api_response(path, region_no=5):
             response_data = response.json()
             return response_data
         elif response.status_code != 404 and response.status_code != 400:
-            log.error(f"请求出错 {response.status_code}, {response.text}, url: {url}")
+            log.error(f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
     except:
         log.error(f"请求出错:")
         log.error(traceback.format_exc())
