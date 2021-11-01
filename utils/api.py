@@ -9,7 +9,12 @@ from utils import config, json, log
 headers = {"token": config.app["apiToken"], "Content-Type": "application/json"}
 
 
-@retry(wait=wait_fixed(3), stop=stop_after_attempt(3))
+def retry_failed(retry_state):
+    log.error(f"请求重试失败: {', '.join(retry_state.args)}")
+    return None
+
+
+@retry(wait=wait_fixed(3), stop=stop_after_attempt(3), retry_error_callback=retry_failed)
 def request(method, path, data=None):
     url = f"{config.app['apiOrigin']}{path}"
     response = getattr(requests, method)(url, headers=headers, data=json.dumps(data) if data is not None else None)
@@ -26,41 +31,16 @@ def request(method, path, data=None):
 
 
 def get(path):
-    try:
-        return request("get", path)
-    except:
-        log.error(f"请求出错: get {path}")
-        log.error(traceback.format_exc())
-        time.sleep(10)
-    return None
+    return request("get", path)
 
 
-@retry(wait=wait_fixed(3), stop=stop_after_attempt(3))
 def post(path, data):
-    try:
-        return request("post", path, data)
-    except:
-        log.error(f"请求出错: post {path}")
-        log.error(traceback.format_exc())
-        time.sleep(10)
-    return None
+    return request("post", path, data)
 
 
 def put(path, data):
-    try:
-        return request("put", path, data)
-    except:
-        log.error(f"请求出错: put {path}")
-        log.error(traceback.format_exc())
-        time.sleep(10)
-    return None
+    return request("put", path, data)
 
 
 def patch(path, data):
-    try:
-        return request("patch", path, data)
-    except:
-        log.error(f"请求出错: patch {path}")
-        log.error(traceback.format_exc())
-        time.sleep(10)
-    return None
+    return request("patch", path, data)

@@ -2,6 +2,7 @@ import time
 import traceback
 
 import requests
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from utils import config, datetime, keys, log, redis
 
@@ -31,20 +32,21 @@ def get_access_token():
     return access_token
 
 
+def retry_failed(retry_state):
+    log.error(f"请求重试失败: {', '.join(retry_state.args)}")
+    return None
+
+
+@retry(wait=wait_fixed(3), stop=stop_after_attempt(3), retry_error_callback=retry_failed)
 def get_api_response(path, region_no=5):
     url = f"{origins[region_no]}{path}?locale=en_US&access_token={get_access_token()}"
     redis.incr(keys.stats_battlenet_api_request())
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            response_data = response.json()
-            return response_data
-        elif response.status_code != 404 and response.status_code != 400:
-            log.error(f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
-    except:
-        log.error(f"请求出错:")
-        log.error(traceback.format_exc())
-        time.sleep(10)
+    response = requests.get(url)
+    if response.status_code == 200:
+        response_data = response.json()
+        return response_data
+    elif response.status_code != 404 and response.status_code != 400:
+        log.error(f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
     return None
 
 
