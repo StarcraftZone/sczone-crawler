@@ -26,18 +26,13 @@ def get(path):
 @retry(wait=wait_fixed(3), stop=stop_after_attempt(3))
 def post(path, data):
     url = f"{config.app['apiOrigin']}{path}"
-    try:
-        response = requests.post(url, data=json.dumps(data), headers=headers)
-        if response.status_code == 200:
-            response_data = response.json()
-            return response_data
-        else:
-            log.error(f"请求出错: {url}, {response.status_code}, {response.text}, url: {url}")
-    except:
-        log.error(f"请求出错: {url}, {json.dumps(data)}")
-        log.error(traceback.format_exc())
-        raise Exception
-    return None
+    response = requests.post(url, data=json.dumps(data), headers=headers)
+    if response.status_code == 200:
+        response_data = response.json()
+        return response_data
+    else:
+        log.error(f"请求出错: {url}, {response.status_code}, {response.text}, url: {url}")
+        return None
 
 
 def put(path, data):
