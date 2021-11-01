@@ -2,6 +2,7 @@ import requests
 import traceback
 import time
 from utils import config, datetime, log, redis, stats, json
+from tenacity import retry, wait_fixed, stop_after_attempt
 
 headers = {"token": config.app["apiToken"], "Content-Type": "application/json"}
 
@@ -22,6 +23,7 @@ def get(path):
     return None
 
 
+@retry(wait=wait_fixed(3), stop=stop_after_attempt(3))
 def post(path, data):
     url = f"{config.app['apiOrigin']}{path}"
     try:
@@ -32,9 +34,9 @@ def post(path, data):
         else:
             log.error(f"请求出错: {url}, {response.status_code}, {response.text}, url: {url}")
     except:
-        log.error(f"请求出错: {url}, ")
+        log.error(f"请求出错: {url}, {json.dumps(data)}")
         log.error(traceback.format_exc())
-        time.sleep(10)
+        raise Exception
     return None
 
 
