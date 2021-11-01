@@ -33,7 +33,7 @@ def get_access_token():
 
 
 def retry_failed(retry_state):
-    log.error(f"请求重试失败: {', '.join(retry_state.args)}")
+    log.error(f"请求重试失败: get {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
     return None
 
 

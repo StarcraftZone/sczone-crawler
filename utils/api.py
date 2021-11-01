@@ -10,7 +10,7 @@ headers = {"token": config.app["apiToken"], "Content-Type": "application/json"}
 
 
 def retry_failed(retry_state):
-    log.error(f"请求重试失败: {', '.join(retry_state.args)}")
+    log.error(f"请求重试失败: {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
     return None
 
 
@@ -21,7 +21,7 @@ def request(method, path, data=None):
     if response.status_code == 200:
         response_data = response.json()
         if response_data["code"] == 0:
-            return response_data["data"]
+            return response_data["data"] if "data" in response_data else None
         else:
             log.error(f"请求出错: {method} {url}, code: {response_data['code']}, response: {response.text}")
             return None
