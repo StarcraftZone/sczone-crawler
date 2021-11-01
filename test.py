@@ -3,6 +3,7 @@ from pymongo import UpdateOne
 from bson import json_util
 from threading import Thread, Lock
 import time
+from tenacity import retry, wait_fixed, stop_after_attempt, RetryError
 
 # data = api.get_api_response("/ladder/1")
 # print(json.dumps(data))
@@ -59,5 +60,10 @@ import time
 # for i in range(10):
 #     Thread(target=test, args=(i,)).start()
 
-season_info = battlenet.get_season_info(5)
-print(season_info)
+
+# season_info = battlenet.get_season_info(5)
+# print(season_info)
+
+response = api.get("/season/48")
+
+print(response)
