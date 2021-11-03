@@ -24,8 +24,6 @@ def inactive_ladder(region_no, ladder_no):
         if update_result.modified_count > 0:
             ladder = mongo.ladders.find_one({"code": ladder_code})
             log.info(f"({region_no}) inactive ladder: {ladder_no}")
-            teams = mongo.teams.find({"ladderCode": ladder_code, "active": 1})
-            inactive_teams(region_no, ladder["gameMode"], teams)
 
 
 def inactive_teams(region_no, game_mode, teams):
@@ -101,7 +99,7 @@ def ladder_task(region_no_list):
                 .limit(1)[0]["number"]
             )
             if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
-                log.info(f"({region_no}) ladder task start")
+                log.info(f"({region_no}) ladder task start from ladder: {min_active_ladder_no}")
                 season = battlenet.get_season_info(region_no)
                 log.info(f"({region_no}) current season number: {season['number']}")
                 api.post(f"/season/crawler", season)
@@ -119,12 +117,11 @@ def ladder_task(region_no_list):
                 # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
                 if current_ladder_no > max_active_ladder_no + 10:
                     if redis.lock(keys.ladder_task_done(region_no), timedelta(minutes=1)):
-                        log.info(f"({region_no}) ladder task done get lock")
                         task_duration_seconds = datetime.get_duration_seconds(
                             redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
                         )
                         log.info(
-                            f"({region_no}) ladder task done, max_ladder_no: {max_active_ladder_no}, duration: {task_duration_seconds}s"
+                            f"({region_no}) ladder task done at ladder: {max_active_ladder_no}, duration: {task_duration_seconds}s"
                         )
 
                         stats.insert(
