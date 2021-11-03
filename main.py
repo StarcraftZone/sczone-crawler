@@ -56,7 +56,7 @@ def update_ladder(ladder_no, character):
     if ladder is None or len(teams) == 0:
         return False
 
-    ladder_active_status = redis.getset(f"status:region:{ladder['regionNo']}:ladder:{ladder['code']}:active", 1)
+    ladder_active_status = redis.getset(f"status:region:{ladder['regionNo']}:ladder:{ladder['number']}:active", 1)
     if ladder_active_status != "1":
         now = datetime.current_time()
         ladder["active"] = 1
