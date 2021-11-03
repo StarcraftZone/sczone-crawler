@@ -64,6 +64,10 @@ from tenacity import retry, wait_fixed, stop_after_attempt, RetryError
 # season_info = battlenet.get_season_info(5)
 # print(season_info)
 
-response = api.get("/season/48")
+# response = api.get("/season/48")
 
-print(response)
+# print(response)
+log.debug("d Hello, World!")
+log.info("i Hello, World!")
+log.warn("w Hello, World!")
+log.error("e Hello, World!")
