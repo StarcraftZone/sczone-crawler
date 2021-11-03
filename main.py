@@ -152,7 +152,7 @@ def ladder_task(region_no_list):
                                     "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(days=1))},
                                     "active": 1,
                                 }
-                            ).limit(10000)
+                            ).limit(100000)
 
                             inactive_teams(region_no, game_mode, teams_to_inactive)
 
