@@ -103,11 +103,12 @@ def ladder_task(region_no_list):
                 task_index += 1
 
             if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
-                log.info(f"({region_no}) ladder task start from ladder: {get_min_active_ladder_no(region_no)}")
+                min_active_ladder_no = get_min_active_ladder_no(region_no)
+                log.info(f"({region_no}) ladder task start from ladder: {min_active_ladder_no}")
                 season = battlenet.get_season_info(region_no)
                 log.info(f"({region_no}) current season number: {season['number']}")
                 api.post(f"/season/crawler", season)
-
+                redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 1)
             current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
 
             ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
@@ -158,7 +159,6 @@ def ladder_task(region_no_list):
 
                             inactive_teams(region_no, game_mode, teams_to_inactive)
 
-                        redis.set(keys.ladder_task_current_no(region_no), get_min_active_ladder_no(region_no) - 1)
                         redis.delete(keys.ladder_task_start_time(region_no))
                         log.info(f"({region_no}) ladder task done success")
                     time.sleep(60)
