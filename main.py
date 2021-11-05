@@ -22,7 +22,6 @@ def inactive_ladder(region_no, ladder_no):
             {"$set": {"active": 0, "updateTime": datetime.current_time()}},
         )
         if update_result.modified_count > 0:
-            ladder = mongo.ladders.find_one({"code": ladder_code})
             log.info(f"({region_no}) inactive ladder: {ladder_no}")
 
 
