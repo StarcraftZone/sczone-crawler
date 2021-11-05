@@ -80,11 +80,11 @@ def update_ladder(ladder_no, character):
     return True
 
 
-def get_min_active_ladder_no():
+def get_min_active_ladder_no(region_no):
     return mongo.ladders.find({"regionNo": region_no, "active": 1}).sort("number", 1).limit(1)[0]["number"]
 
 
-def get_max_active_ladder_no():
+def get_max_active_ladder_no(region_no):
     return (
         mongo.ladders.find({"regionNo": region_no, "active": 1})
         .sort("number", pymongo.DESCENDING)
@@ -103,7 +103,7 @@ def ladder_task(region_no_list):
                 task_index += 1
 
             if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
-                log.info(f"({region_no}) ladder task start from ladder: {get_min_active_ladder_no()}")
+                log.info(f"({region_no}) ladder task start from ladder: {get_min_active_ladder_no(region_no)}")
                 season = battlenet.get_season_info(region_no)
                 log.info(f"({region_no}) current season number: {season['number']}")
                 api.post(f"/season/crawler", season)
@@ -116,7 +116,7 @@ def ladder_task(region_no_list):
                 inactive_ladder(region_no, current_ladder_no)
 
                 # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
-                max_active_ladder_no = get_max_active_ladder_no()
+                max_active_ladder_no = get_max_active_ladder_no(region_no)
                 if current_ladder_no > max_active_ladder_no + 10:
                     if redis.lock(keys.ladder_task_done(region_no), timedelta(minutes=5)):
                         task_duration_seconds = datetime.get_duration_seconds(
@@ -158,7 +158,7 @@ def ladder_task(region_no_list):
 
                             inactive_teams(region_no, game_mode, teams_to_inactive)
 
-                        redis.set(keys.ladder_task_current_no(region_no), get_min_active_ladder_no() - 1)
+                        redis.set(keys.ladder_task_current_no(region_no), get_min_active_ladder_no(region_no) - 1)
                         redis.delete(keys.ladder_task_start_time(region_no))
                         log.info(f"({region_no}) ladder task done success")
                     time.sleep(60)
