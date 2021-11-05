@@ -161,9 +161,7 @@ def ladder_task(region_no_list):
                         redis.set(keys.ladder_task_current_no(region_no), get_min_active_ladder_no() - 1)
                         redis.delete(keys.ladder_task_start_time(region_no))
                         log.info(f"({region_no}) ladder task done success")
-                        time.sleep(60)
-                    else:
-                        time.sleep(60)
+                    time.sleep(60)
             else:
                 # 更新 Character
                 ladder_updated = False
