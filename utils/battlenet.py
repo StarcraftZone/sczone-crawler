@@ -1,5 +1,5 @@
 import time
-import traceback
+from datetime import timedelta
 
 import requests
 from tenacity import retry, stop_after_attempt, wait_fixed
@@ -17,18 +17,23 @@ origins = {
 def get_access_token():
     access_token = redis.get("token:battlenet")
     if access_token is None:
-        bnetClientId = config.credentials["bnetClientId"]
-        bnetClientSecret = config.credentials["bnetClientSecret"]
-        response = requests.post(
-            "https://www.battlenet.com.cn/oauth/token",
-            auth=(bnetClientId, bnetClientSecret),
-            data={"grant_type": "client_credentials"},
-        )
-        response_data = response.json()
-        access_token = response_data["access_token"]
-        expires_in = response_data["expires_in"]
-        redis.setex("token:battlenet", expires_in, access_token)
-        log.info("fresh access token: " + access_token)
+        if redis.lock("get_access_token", timedelta(seconds=5)):
+            bnetClientId = config.credentials["bnetClientId"]
+            bnetClientSecret = config.credentials["bnetClientSecret"]
+            response = requests.post(
+                "https://www.battlenet.com.cn/oauth/token",
+                auth=(bnetClientId, bnetClientSecret),
+                data={"grant_type": "client_credentials"},
+            )
+            response_data = response.json()
+            access_token = response_data["access_token"]
+            expires_in = response_data["expires_in"]
+            redis.setex("token:battlenet", expires_in, access_token)
+            log.info("refresh access token: " + access_token)
+        else:
+            log.info("wait for refreshing token")
+            time.sleep(5)
+            access_token = get_access_token()
     return access_token
 
 
@@ -38,8 +43,8 @@ def retry_failed(retry_state):
 
 
 @retry(wait=wait_fixed(3), stop=stop_after_attempt(3), retry_error_callback=retry_failed)
-def get_api_response(path, region_no=5):
-    url = f"{origins[region_no]}{path}?locale=en_US&access_token={get_access_token()}"
+def get_api_response(path, api_region_no=5):
+    url = f"{origins[api_region_no]}{path}?locale=en_US&access_token={get_access_token()}"
     redis.incr(keys.stats_battlenet_api_request())
     response = requests.get(url)
     if response.status_code == 200:

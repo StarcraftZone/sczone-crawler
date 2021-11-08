@@ -2,8 +2,6 @@ import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
 
-from utils import datetime
-
 os.makedirs("logs", exist_ok=True)
 
 log_formatter = logging.Formatter("%(asctime)s [%(levelname)-8s] %(message)s")
