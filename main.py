@@ -180,45 +180,43 @@ def ladder_task(region_no_list):
                         log.info(f"({region_no}) ladder task done success")
                     time.sleep(60)
             else:
-                # 更新 Character
-                ladder_updated = False
-                ladder_update_retry_times = 0
-                bulk_operations = []
-                for ladder_member in ladder_members:
-                    now = datetime.current_time()
-                    bulk_operations.append(
-                        UpdateOne(
-                            {"code": ladder_member["code"]},
-                            {
-                                "$set": {
-                                    "code": ladder_member["code"],
-                                    "regionNo": ladder_member["regionNo"],
-                                    "realmNo": ladder_member["realmNo"],
-                                    "profileNo": ladder_member["profileNo"],
-                                    "displayName": ladder_member["displayName"],
-                                    "clanTag": ladder_member["clanTag"],
-                                    "clanName": ladder_member["clanName"],
-                                    "updateTime": now,
+                # 测试是否是正常数据（通过第一个 member 获取 ladder 数据）
+                ladder_updated = update_ladder(current_ladder_no, ladder_members[0])
+
+                if ladder_updated:
+                    # 更新 Character
+                    bulk_operations = []
+                    for ladder_member in ladder_members:
+                        now = datetime.current_time()
+                        bulk_operations.append(
+                            UpdateOne(
+                                {"code": ladder_member["code"]},
+                                {
+                                    "$set": {
+                                        "code": ladder_member["code"],
+                                        "regionNo": ladder_member["regionNo"],
+                                        "realmNo": ladder_member["realmNo"],
+                                        "profileNo": ladder_member["profileNo"],
+                                        "displayName": ladder_member["displayName"],
+                                        "clanTag": ladder_member["clanTag"],
+                                        "clanName": ladder_member["clanName"],
+                                        "updateTime": now,
+                                    },
+                                    "$setOnInsert": {"createTime": now},
                                 },
-                                "$setOnInsert": {"createTime": now},
-                            },
-                            upsert=True,
+                                upsert=True,
+                            )
                         )
-                    )
 
-                    if not ladder_updated and ladder_update_retry_times < 2:
-                        # 为提升速度，只重试 2 次
-                        ladder_updated = update_ladder(current_ladder_no, ladder_member)
-                        ladder_update_retry_times += 1
-                if len(bulk_operations) > 0:
-                    mongo.characters.bulk_write(bulk_operations)
-                    try:
-                        api.post("/character/batch", ladder_members)
-                    except:
-                        log.error(f"api character batch error, ladder members count: {len(ladder_members)}")
-                        time.sleep(60)
+                    if len(bulk_operations) > 0:
+                        mongo.characters.bulk_write(bulk_operations)
+                        try:
+                            api.post("/character/batch", ladder_members)
+                        except:
+                            log.error(f"api character batch error, ladder members count: {len(ladder_members)}")
+                            time.sleep(60)
 
-                if not ladder_updated:
+                else:
                     # 通过新方法未能获取到 ladder 信息
                     inactive_ladder(region_no, current_ladder_no)
 
