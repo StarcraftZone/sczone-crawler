@@ -147,7 +147,7 @@ def ladder_task(region_no_list):
                             },
                         )
 
-                        # 将当前 region 中 team 更新时间早于 ladder job startTime - 6 小时且活跃的 team 置为非活跃
+                        # 将当前 region 中 team 更新时间早于 ladder job startTime - task duration * 2 且活跃的 team 置为非活跃
                         task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
                         for game_mode in [
                             "1v1",
@@ -163,7 +163,11 @@ def ladder_task(region_no_list):
                                 {
                                     "regionNo": region_no,
                                     "gameMode": game_mode,
-                                    "updateTime": {"$lte": datetime.minus(task_start_time, timedelta(hours=6))},
+                                    "updateTime": {
+                                        "$lte": datetime.minus(
+                                            task_start_time, timedelta(seconds=task_duration_seconds * 2)
+                                        )
+                                    },
                                     "active": 1,
                                 }
                             ).limit(100000)
