@@ -83,9 +83,17 @@ def update_ladder(ladder_no, character):
 def get_min_active_ladder_no(region_no):
     active_ladder_count = mongo.ladders.count_documents({"regionNo": region_no, "active": 1})
     if active_ladder_count > 0:
-        return mongo.ladders.find({"regionNo": region_no, "active": 1}).sort("number", 1).limit(1)[0]["number"]
+        return (
+            mongo.ladders.find({"regionNo": region_no, "active": 1})
+            .sort("number", pymongo.ASCENDING)
+            .limit(1)[0]["number"]
+        )
     else:
-        return mongo.ladders.find({"regionNo": region_no, "active": 0}).sort("number", -1).limit(1)[0]["number"]
+        return (
+            mongo.ladders.find({"regionNo": region_no, "active": 0})
+            .sort("number", pymongo.DESCENDING)
+            .limit(1)[0]["number"]
+        )
 
 
 def get_max_active_ladder_no(region_no):
@@ -249,10 +257,8 @@ if __name__ == "__main__":
     mongo.stats.create_index([("date", 1)], name="idx_date", background=True)
     mongo.stats.create_index([("type", 1)], name="idx_type", background=True)
 
-    region_no_list = []
-    for region_no in [1, 2, 3, 5]:
-        for _ in range(math.ceil(mongo.ladders.count_documents({"regionNo": region_no, "active": 1}) / 100)):
-            region_no_list.append(region_no)
+    # region teams ratio, 4:4:1:3, set to 4:4:1:4 to update faster for CN
+    region_no_list = [1, 1, 1, 1, 2, 2, 2, 2, 3, 5, 5, 5, 5]
 
     # 遍历天梯成员任务
     for _ in range(10):
