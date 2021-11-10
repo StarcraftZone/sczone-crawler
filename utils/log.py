@@ -23,17 +23,17 @@ logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
 
-def debug(msg):
-    logger.debug(msg)
+def debug(region_no, msg):
+    logger.debug(f"({region_no}) {msg}")
 
 
-def info(msg):
-    logger.info(msg)
+def info(region_no, msg):
+    logger.info(f"({region_no}) {msg}")
 
 
-def warn(msg):
-    logger.warn(msg)
+def warn(region_no, msg):
+    logger.warn(f"({region_no}) {msg}")
 
 
-def error(msg):
-    logger.error(msg)
+def error(region_no, msg):
+    logger.error(f"({region_no}) {msg}")

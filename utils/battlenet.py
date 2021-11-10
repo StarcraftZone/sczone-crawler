@@ -29,16 +29,16 @@ def get_access_token():
             access_token = response_data["access_token"]
             expires_in = response_data["expires_in"]
             redis.setex("token:battlenet", expires_in, access_token)
-            log.info("refresh access token: " + access_token)
+            log.info(0, "refresh access token: " + access_token)
         else:
-            log.info("wait for refreshing token")
+            log.info(0, "wait for refreshing token")
             time.sleep(5)
             access_token = get_access_token()
     return access_token
 
 
 def retry_failed(retry_state):
-    log.error(f"请求重试失败: get {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
+    log.error(0, f"请求重试失败: get {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
     return None
 
 
@@ -51,7 +51,7 @@ def get_api_response(path, api_region_no=5):
         response_data = response.json()
         return response_data
     elif response.status_code != 404 and response.status_code != 400:
-        log.error(f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
+        log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
     return None
 
 

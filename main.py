@@ -22,16 +22,16 @@ def inactive_ladder(region_no, ladder_no):
             {"$set": {"active": 0, "updateTime": datetime.current_time()}},
         )
         if update_result.modified_count > 0:
-            log.info(f"({region_no}) inactive ladder: {ladder_no}")
+            log.info(region_no, f"inactive ladder: {ladder_no}")
     else:
-        log.info(f"({region_no}) skip inactive ladder: {ladder_no}")
+        log.info(region_no, f"skip inactive ladder: {ladder_no}")
 
 
 def inactive_teams(region_no, game_mode, teams):
     team_codes = []
     bulk_operations = []
     for team in teams:
-        log.info(f"({region_no}) inactive team: {team['code']}")
+        log.info(region_no, f"inactive team: {team['code']}")
         bulk_operations.append(
             UpdateOne(
                 {"code": team["code"]},
@@ -64,7 +64,7 @@ def update_ladder(ladder_no, character):
             {"code": ladder["code"]}, {"$set": ladder, "$setOnInsert": {"createTime": now}}, upsert=True
         )
         if update_result.upserted_id is not None:
-            log.info(f"({character['regionNo']}) found new ladder: {ladder['code']}")
+            log.info(character["regionNo"], f"found new ladder: {ladder['code']}")
 
     bulk_operations = []
     for team in teams:
@@ -117,9 +117,9 @@ def ladder_task(region_no_list):
 
             if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
                 min_active_ladder_no = get_min_active_ladder_no(region_no)
-                log.info(f"({region_no}) ladder task start from ladder: {min_active_ladder_no}")
+                log.info(region_no, f"ladder task start from ladder: {min_active_ladder_no}")
                 season = battlenet.get_season_info(region_no)
-                log.info(f"({region_no}) current season number: {season['number']}")
+                log.info(region_no, f"current season number: {season['number']}")
                 api.post(f"/season/crawler", season)
                 redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 12)
             current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
@@ -127,6 +127,7 @@ def ladder_task(region_no_list):
             ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
             if len(ladder_members) == 0:
                 # 成员为空，将 ladder 置为非活跃
+                log.info(region_no, f"empty ladder: {current_ladder_no}")
                 inactive_ladder(region_no, current_ladder_no)
 
                 # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
@@ -137,7 +138,8 @@ def ladder_task(region_no_list):
                             redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
                         )
                         log.info(
-                            f"({region_no}) ladder task done at ladder: {max_active_ladder_no}, duration: {task_duration_seconds}s"
+                            region_no,
+                            f"ladder task done at ladder: {max_active_ladder_no}, duration: {task_duration_seconds}s",
                         )
 
                         stats.insert(
@@ -177,7 +179,7 @@ def ladder_task(region_no_list):
                             inactive_teams(region_no, game_mode, teams_to_inactive)
 
                         redis.delete(keys.ladder_task_start_time(region_no))
-                        log.info(f"({region_no}) ladder task done success")
+                        log.info(region_no, f"ladder task done success")
                     time.sleep(60)
             else:
                 # 测试是否是正常数据（通过第一个 member 获取 ladder 数据）
@@ -213,15 +215,18 @@ def ladder_task(region_no_list):
                         try:
                             api.post("/character/batch", ladder_members)
                         except:
-                            log.error(f"api character batch error, ladder members count: {len(ladder_members)}")
+                            log.error(
+                                region_no, f"api character batch error, ladder members count: {len(ladder_members)}"
+                            )
                             time.sleep(60)
 
                 else:
                     # 通过新方法未能获取到 ladder 信息
+                    log.info(region_no, f"legacy ladder: {current_ladder_no}")
                     inactive_ladder(region_no, current_ladder_no)
 
         except:
-            log.error(traceback.format_exc())
+            log.error(0, traceback.format_exc())
             # 出错后，休眠 1 分钟
             time.sleep(60)
 
@@ -253,4 +258,4 @@ if __name__ == "__main__":
     # 遍历天梯成员任务
     for _ in range(10):
         Thread(target=ladder_task, args=(region_no_list,)).start()
-    log.info("sczone crawler started")
+    log.info(0, "sczone crawler started")
