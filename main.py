@@ -80,15 +80,27 @@ def update_ladder(ladder_no, character):
 
 
 def get_min_active_ladder_no(region_no):
-    return mongo.ladders.find({"regionNo": region_no, "active": 1}).sort("number", 1).limit(1)[0]["number"]
+    active_ladder_count = mongo.ladders.count({"regionNo": region_no, "active": 1})
+    if active_ladder_count > 0:
+        return mongo.ladders.find({"regionNo": region_no, "active": 1}).sort("number", 1).limit(1)[0]["number"]
+    else:
+        return mongo.ladders.find({"regionNo": region_no, "active": 0}).sort("number", -1).limit(1)[0]["number"]
 
 
 def get_max_active_ladder_no(region_no):
-    return (
-        mongo.ladders.find({"regionNo": region_no, "active": 1})
-        .sort("number", pymongo.DESCENDING)
-        .limit(1)[0]["number"]
-    )
+    active_ladder_count = mongo.ladders.count({"regionNo": region_no, "active": 1})
+    if active_ladder_count > 0:
+        return (
+            mongo.ladders.find({"regionNo": region_no, "active": 1})
+            .sort("number", pymongo.DESCENDING)
+            .limit(1)[0]["number"]
+        )
+    else:
+        return (
+            mongo.ladders.find({"regionNo": region_no, "active": 0})
+            .sort("number", pymongo.DESCENDING)
+            .limit(1)[0]["number"]
+        )
 
 
 def ladder_task(region_no_list):
@@ -107,7 +119,7 @@ def ladder_task(region_no_list):
                 season = battlenet.get_season_info(region_no)
                 log.info(f"({region_no}) current season number: {season['number']}")
                 api.post(f"/season/crawler", season)
-                redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 1)
+                redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 10)
             current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
 
             ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
