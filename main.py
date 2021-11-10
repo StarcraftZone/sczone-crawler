@@ -1,7 +1,8 @@
-from threading import Thread, Lock
+import math
 import time
 import traceback
 from datetime import timedelta
+from threading import Lock, Thread
 
 import pymongo
 from pymongo import UpdateOne
@@ -250,7 +251,7 @@ if __name__ == "__main__":
 
     region_no_list = []
     for region_no in [1, 2, 3, 5]:
-        for _ in range(round(mongo.ladders.count_documents({"regionNo": region_no, "active": 1}) / 100)):
+        for _ in range(math.ceil(mongo.ladders.count_documents({"regionNo": region_no, "active": 1}) / 100)):
             region_no_list.append(region_no)
 
     # 遍历天梯成员任务
