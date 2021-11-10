@@ -80,7 +80,7 @@ def update_ladder(ladder_no, character):
 
 
 def get_min_active_ladder_no(region_no):
-    active_ladder_count = mongo.ladders.count({"regionNo": region_no, "active": 1})
+    active_ladder_count = mongo.ladders.count_documents({"regionNo": region_no, "active": 1})
     if active_ladder_count > 0:
         return mongo.ladders.find({"regionNo": region_no, "active": 1}).sort("number", 1).limit(1)[0]["number"]
     else:
@@ -88,7 +88,7 @@ def get_min_active_ladder_no(region_no):
 
 
 def get_max_active_ladder_no(region_no):
-    active_ladder_count = mongo.ladders.count({"regionNo": region_no, "active": 1})
+    active_ladder_count = mongo.ladders.count_documents({"regionNo": region_no, "active": 1})
     if active_ladder_count > 0:
         return (
             mongo.ladders.find({"regionNo": region_no, "active": 1})
