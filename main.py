@@ -23,6 +23,8 @@ def inactive_ladder(region_no, ladder_no):
         )
         if update_result.modified_count > 0:
             log.info(f"({region_no}) inactive ladder: {ladder_no}")
+    else:
+        log.info(f"({region_no}) skip inactive ladder: {ladder_no}")
 
 
 def inactive_teams(region_no, game_mode, teams):
