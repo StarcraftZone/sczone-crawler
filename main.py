@@ -121,7 +121,7 @@ def ladder_task(region_no_list):
                 season = battlenet.get_season_info(region_no)
                 log.info(f"({region_no}) current season number: {season['number']}")
                 api.post(f"/season/crawler", season)
-                redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 10)
+                redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 12)
             current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
 
             ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
@@ -131,7 +131,7 @@ def ladder_task(region_no_list):
 
                 # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
                 max_active_ladder_no = get_max_active_ladder_no(region_no)
-                if current_ladder_no > max_active_ladder_no + 10:
+                if current_ladder_no > max_active_ladder_no + 12:
                     if redis.lock(keys.ladder_task_done(region_no), timedelta(minutes=5)):
                         task_duration_seconds = datetime.get_duration_seconds(
                             redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
@@ -206,8 +206,8 @@ def ladder_task(region_no_list):
                         )
                     )
 
-                    if not ladder_updated and ladder_update_retry_times < 10:
-                        # 为提升速度，只重试 10 次
+                    if not ladder_updated and ladder_update_retry_times < 2:
+                        # 为提升速度，只重试 2 次
                         ladder_updated = update_ladder(current_ladder_no, ladder_member)
                         ladder_update_retry_times += 1
                 if len(bulk_operations) > 0:
