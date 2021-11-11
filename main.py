@@ -44,6 +44,7 @@ def inactive_teams(region_no, game_mode, teams):
             f"/team/batch/inactive",
             {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes},
         )
+        log.info(region_no, f"total inactive {len(team_codes)} teams")
 
 
 def update_ladder(ladder_no, character):
@@ -137,7 +138,7 @@ def ladder_task(region_no_list):
                 log.info(region_no, f"empty ladder: {current_ladder_no}")
                 inactive_ladder(region_no, current_ladder_no)
 
-                # 最大 ladder 编号再往后跑 10 个，都不存在则认为任务完成
+                # 最大 ladder 编号再往后跑 12 个，都不存在则认为任务完成
                 max_active_ladder_no = get_max_active_ladder_no(region_no)
                 if current_ladder_no > max_active_ladder_no + 12:
                     if redis.lock(keys.ladder_task_done(region_no), timedelta(minutes=5)):
@@ -158,7 +159,7 @@ def ladder_task(region_no_list):
                             },
                         )
 
-                        # 将当前 region 中 team 更新时间早于 ladder job startTime - task duration * 2 且活跃的 team 置为非活跃
+                        # 将当前 region 中 team 更新时间早于 ladder job startTime - task duration * 3 且活跃的 team 置为非活跃
                         task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
                         for game_mode in [
                             "1v1",
@@ -176,7 +177,7 @@ def ladder_task(region_no_list):
                                     "gameMode": game_mode,
                                     "updateTime": {
                                         "$lte": datetime.minus(
-                                            task_start_time, timedelta(seconds=task_duration_seconds * 2)
+                                            task_start_time, timedelta(seconds=task_duration_seconds * 3)
                                         )
                                     },
                                     "active": 1,
