@@ -36,12 +36,12 @@ from tenacity import retry, wait_fixed, stop_after_attempt, RetryError
 # print(len(team_codes_to_inactive))
 # api.post(f"/team/batch", {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes_to_inactive})
 
-# log.info("start")
+
 # teams = mongo.mongo.teams.find({}).limit(1000000)
 # for team in teams:
 #     if team["code"] != battlenet.get_team_code(team["regionNo"], team["gameMode"], team["teamMembers"]):
 #         mongo.mongo.teams.delete_one({"code": team["code"]})
-# log.info("end")
+
 
 # index = 0
 # lock = Lock()
@@ -67,7 +67,7 @@ from tenacity import retry, wait_fixed, stop_after_attempt, RetryError
 # response = api.get("/season/48")
 
 # print(response)
-log.debug("d Hello, World!")
-log.info("i Hello, World!")
-log.warn("w Hello, World!")
-log.error("e Hello, World!")
+log.debug(0, "d Hello, World!")
+log.info(0, "i Hello, World!")
+log.warn(0, "w Hello, World!")
+log.error(0, "e Hello, World!")
