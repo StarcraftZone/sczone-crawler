@@ -38,17 +38,7 @@ def get_access_token():
 
 
 def retry_failed(retry_state):
-    log.info(0, f"使用官网接口重试: get {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
-    url = f"https://starcraft2.com/en-us/api{retry_state.args[1]}?locale=en_US"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            response_data = response.json()
-            return response_data
-        elif response.status_code != 404 and response.status_code != 400:
-            log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
-    except:
-        log.error(0, f"官网接口出错: get {url}, status code: {response.status_code}, response: {response.text}")
+    log.error(0, f"请求重试失败: get {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
     return None
 
 
@@ -60,6 +50,14 @@ def get_api_response(path, api_region_no=5):
     if response.status_code == 200:
         response_data = response.json()
         return response_data
+    elif response.status_code == 503:
+        log.info(0, f"使用官网接口重试: get {url}, status code: {response.status_code}, response: {response.text}")
+        new_response = requests.get(f"https://starcraft2.com/en-us/api{path}?locale=en_US")
+        if new_response.status_code == 200:
+            response_data = new_response.json()
+            return response_data
+        else:
+            log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
     elif response.status_code != 404 and response.status_code != 400:
         log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
     return None
