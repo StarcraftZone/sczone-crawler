@@ -234,6 +234,7 @@ def ladder_task(region_no_list):
                     inactive_ladder(region_no, current_ladder_no)
 
         except:
+            log.error(0, "task loop error")
             log.error(0, traceback.format_exc())
             # 出错后，休眠 1 分钟
             time.sleep(60)
@@ -241,22 +242,26 @@ def ladder_task(region_no_list):
 
 if __name__ == "__main__":
     # 创建 mongo index
-    mongo.characters.create_index([("code", 1)], name="idx_code", unique=True, background=True)
-    mongo.characters.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
-    mongo.teams.create_index([("code", 1)], name="idx_code", unique=True, background=True)
-    mongo.teams.create_index([("ladderCode", 1)], name="idx_ladderCode", background=True)
-    mongo.teams.create_index([("active", 1)], name="idx_active", background=True)
-    mongo.teams.create_index(
-        [("regionNo", 1), ("active", 1), ("updateTime", 1)],
-        name="idx_inactive",
-        background=True,
-    )
-    mongo.ladders.create_index([("code", 1)], name="idx_code", unique=True, background=True)
-    mongo.ladders.create_index([("active", 1)], name="idx_active", background=True)
-    mongo.ladders.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
-    mongo.stats.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
-    mongo.stats.create_index([("date", 1)], name="idx_date", background=True)
-    mongo.stats.create_index([("type", 1)], name="idx_type", background=True)
+    try:
+        mongo.characters.create_index([("code", 1)], name="idx_code", unique=True, background=True)
+        mongo.characters.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
+        mongo.teams.create_index([("code", 1)], name="idx_code", unique=True, background=True)
+        mongo.teams.create_index([("ladderCode", 1)], name="idx_ladderCode", background=True)
+        mongo.teams.create_index([("active", 1)], name="idx_active", background=True)
+        mongo.teams.create_index(
+            [("regionNo", 1), ("active", 1), ("updateTime", 1)],
+            name="idx_inactive",
+            background=True,
+        )
+        mongo.ladders.create_index([("code", 1)], name="idx_code", unique=True, background=True)
+        mongo.ladders.create_index([("active", 1)], name="idx_active", background=True)
+        mongo.ladders.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
+        mongo.stats.create_index([("regionNo", 1)], name="idx_regionNo", background=True)
+        mongo.stats.create_index([("date", 1)], name="idx_date", background=True)
+        mongo.stats.create_index([("type", 1)], name="idx_type", background=True)
+    except:
+        log.error(0, "mongo create_index error")
+        log.error(0, traceback.format_exc())
 
     # region teams ratio, 4:4:1:3, set to 4:4:1:4 to update faster for CN
     region_no_list = [1, 1, 1, 1, 2, 2, 2, 2, 3, 5, 5, 5, 5]
