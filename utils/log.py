@@ -4,7 +4,7 @@ from logging.handlers import TimedRotatingFileHandler
 
 os.makedirs("logs", exist_ok=True)
 
-log_formatter = logging.Formatter("%(asctime)s [%(levelname)-8s] %(message)s")
+log_formatter = logging.Formatter("%(asctime)s [%(levelname)-8s] [%(threadName)-9s] %(message)s")
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(log_formatter)
