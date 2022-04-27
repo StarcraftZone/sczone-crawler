@@ -7,7 +7,7 @@ from threading import Lock, Thread
 import pymongo
 from pymongo import UpdateOne
 
-from utils import api, battlenet, datetime, keys, log, redis, stats
+from utils import api, battlenet, config, datetime, keys, log, redis, stats
 from utils.mongo import mongo
 
 task_index = 0
@@ -267,6 +267,7 @@ if __name__ == "__main__":
     region_no_list = [1, 1, 1, 1, 2, 2, 2, 2, 3, 5, 5, 5, 5]
 
     # 遍历天梯成员任务
-    for _ in range(10):
+    threads = config.getint("app", "threadCount")
+    for _ in range(threads):
         Thread(target=ladder_task, args=(region_no_list,)).start()
-    log.info(0, "sczone crawler started")
+    log.info(0, f"sczone crawler started, threads: {threads}")
