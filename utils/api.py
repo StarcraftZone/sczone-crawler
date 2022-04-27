@@ -11,7 +11,7 @@ def retry_failed(retry_state):
     return None
 
 
-@retry(wait=wait_fixed(3), stop=stop_after_attempt(3), retry_error_callback=retry_failed)
+# @retry(wait=wait_fixed(3), stop=stop_after_attempt(3), retry_error_callback=retry_failed)
 def request(method, path, data=None):
     url = f"{config.app['apiOrigin']}{path}"
     response = getattr(requests, method)(url, headers=headers, data=json.dumps(data) if data is not None else None)
