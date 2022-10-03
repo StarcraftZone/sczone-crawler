@@ -7,4 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 
 COPY . /app
 
-CMD ["python", "-u", "main.py"]
+ENV REGION_NO=5
+
+CMD ["sh", "-c", "python -u main.py $REGION_NO"]

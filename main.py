@@ -1,5 +1,6 @@
 import math
 import time
+import sys
 import traceback
 from datetime import timedelta
 from threading import Lock, Thread
@@ -113,16 +114,19 @@ def get_max_active_ladder_no(region_no):
         )
 
 
-def ladder_task(region_no_list):
+def ladder_task_random_region(region_no_list):
+    global task_index
+    with lock:
+        if task_index >= len(region_no_list):
+            task_index = 0
+        region_no = region_no_list[task_index]
+        task_index += 1
+    ladder_task(region_no)
+
+
+def ladder_task(region_no):
     while True:
         try:
-            global task_index
-            with lock:
-                if task_index >= len(region_no_list):
-                    task_index = 0
-                region_no = region_no_list[task_index]
-                task_index += 1
-
             if redis.setnx(keys.ladder_task_start_time(region_no), datetime.current_time_str()):
                 min_active_ladder_no = get_min_active_ladder_no(region_no)
                 log.info(region_no, f"ladder task start from ladder: {min_active_ladder_no}")
@@ -188,6 +192,7 @@ def ladder_task(region_no_list):
 
                         redis.delete(keys.ladder_task_start_time(region_no))
                         log.info(region_no, f"ladder task done success")
+                    log.info(region_no, f"sleep 60s")
                     time.sleep(60)
             else:
                 # 测试是否是正常数据（通过第一个 member 获取 ladder 数据）
@@ -267,7 +272,12 @@ if __name__ == "__main__":
     region_no_list = [1, 1, 1, 1, 2, 2, 2, 2, 3, 5, 5, 5, 5]
 
     # 遍历天梯成员任务
-    threads = config.getint("app", "threadCount")
-    for _ in range(threads):
-        Thread(target=ladder_task, args=(region_no_list,)).start()
-    log.info(0, f"sczone crawler started, threads: {threads}")
+    # threads = config.getint("app", "threadCount")
+    # for _ in range(threads):
+    #     Thread(target=ladder_task_random_region, args=(region_no_list,)).start()
+    # log.info(0, f"sczone crawler started, threads: {threads}")
+
+    # 单线程
+    region_no = sys.argv[1]
+    log.info(0, f"sczone crawler started, single thread mode, region_no: {region_no}")
+    ladder_task(region_no)
