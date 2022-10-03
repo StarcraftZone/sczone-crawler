@@ -186,7 +186,7 @@ def ladder_task(region_no):
                                     },
                                     "active": 1,
                                 }
-                            ).limit(100000)
+                            ).limit(10000)
 
                             inactive_teams(region_no, game_mode, teams_to_inactive)
 
