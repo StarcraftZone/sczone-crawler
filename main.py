@@ -278,6 +278,6 @@ if __name__ == "__main__":
     # log.info(0, f"sczone crawler started, threads: {threads}")
 
     # 单线程
-    region_no = sys.argv[1]
+    region_no = int(sys.argv[1])
     log.info(0, f"sczone crawler started, single thread mode, region_no: {region_no}")
     ladder_task(region_no)
