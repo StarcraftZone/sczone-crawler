@@ -24,6 +24,7 @@ def get_access_token():
                 "https://www.battlenet.com.cn/oauth/token",
                 auth=(bnetClientId, bnetClientSecret),
                 data={"grant_type": "client_credentials"},
+                timeout=60,
             )
             response_data = response.json()
             access_token = response_data["access_token"]
@@ -46,13 +47,13 @@ def retry_failed(retry_state):
 def get_api_response(path, api_region_no=5):
     url = f"{origins[api_region_no]}{path}?locale=en_US&access_token={get_access_token()}"
     redis.incr(keys.stats_battlenet_api_request())
-    response = requests.get(url)
+    response = requests.get(url, timeout=60)
     if response.status_code == 200:
         response_data = response.json()
         return response_data
     elif response.status_code == 503:
         log.info(0, f"使用官网接口重试: get {url}, status code: {response.status_code}, response: {response.text}")
-        new_response = requests.get(f"https://starcraft2.com/en-us/api{path}?locale=en_US")
+        new_response = requests.get(f"https://starcraft2.com/en-us/api{path}?locale=en_US", timeout=60)
         if new_response.status_code == 200:
             response_data = new_response.json()
             return response_data
