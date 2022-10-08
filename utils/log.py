@@ -11,7 +11,7 @@ stream_handler.setFormatter(log_formatter)
 stream_handler.setLevel(logging.INFO)
 
 file_handler = TimedRotatingFileHandler(
-    f"logs/sczone-crawler-{os.environ.get('REGION_NO')}", when="midnight", interval=1, backupCount=365, encoding="utf-8"
+    "logs/sczone-crawler", when="midnight", interval=1, backupCount=365, encoding="utf-8"
 )
 file_handler.suffix = "%Y%m%d.log"
 file_handler.setFormatter(log_formatter)
