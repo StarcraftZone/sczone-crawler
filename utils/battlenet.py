@@ -65,7 +65,7 @@ def get_api_response(path, api_region_no=5):
 
 
 def get_season_info(region_no):
-    response = get_api_response(f"/sc2/ladder/season/{region_no}")
+    response, _ = get_api_response(f"/sc2/ladder/season/{region_no}")
     season = {
         "code": f"{region_no}_{response['seasonId']}",
         "regionNo": region_no,
@@ -119,7 +119,7 @@ def get_valid_mmr(team):
 
 # 获取角色下所有天梯
 def get_character_all_ladders(region_no, realm_no, profile_no):
-    response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/summary")
+    response, _ = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/summary")
     ladders = []
     if response is not None:
         for membership in response["allLadderMemberships"]:
@@ -158,7 +158,7 @@ def get_ladder_members(region_no, ladder_no):
 
 # 获取指定天梯中所有队伍
 def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
-    response = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder_no}")
+    response, _ = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder_no}")
     teams = []
     if response is not None and "currentLadderMembership" in response:
         ladder = {
