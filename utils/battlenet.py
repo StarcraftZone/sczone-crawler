@@ -50,18 +50,18 @@ def get_api_response(path, api_region_no=5):
     response = requests.get(url, timeout=60)
     if response.status_code == 200:
         response_data = response.json()
-        return response_data
-    elif response.status_code == 503:
+        return response_data, response.status_code
+    elif response.status_code == 503 or response.status_code == 504 or response.status_code == 401:
         log.info(0, f"使用官网接口重试: get {url}, status code: {response.status_code}, response: {response.text}")
         new_response = requests.get(f"https://starcraft2.com/en-us/api{path}?locale=en_US", timeout=60)
         if new_response.status_code == 200:
             response_data = new_response.json()
-            return response_data
+            return response_data, new_response.status_code
         else:
             log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
     elif response.status_code != 404 and response.status_code != 400:
         log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
-    return None
+    return None, response.status_code
 
 
 def get_season_info(region_no):
@@ -137,7 +137,7 @@ def get_character_all_ladders(region_no, realm_no, profile_no):
 
 # 获取天梯信息（过时接口）
 def get_ladder_members(region_no, ladder_no):
-    response = get_api_response(f"/sc2/legacy/ladder/{region_no}/{ladder_no}")
+    response, status_code = get_api_response(f"/sc2/legacy/ladder/{region_no}/{ladder_no}")
     members = []
     if response is not None:
         for member_info in response["ladderMembers"]:
@@ -153,7 +153,7 @@ def get_ladder_members(region_no, ladder_no):
                     "clanName": character["clanName"] if "clanName" in character else None,
                 }
             )
-    return members
+    return members, status_code
 
 
 # 获取指定天梯中所有队伍

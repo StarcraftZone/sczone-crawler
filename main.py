@@ -136,8 +136,51 @@ def ladder_task(region_no):
                 redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 12)
             current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
 
-            ladder_members = battlenet.get_ladder_members(region_no, current_ladder_no)
-            if len(ladder_members) == 0:
+            ladder_members, status_code = battlenet.get_ladder_members(region_no, current_ladder_no)
+            if len(ladder_members) > 0:
+                # 测试是否是正常数据（通过第一个 member 获取 ladder 数据）
+                ladder_updated = update_ladder(current_ladder_no, ladder_members[0])
+
+                if ladder_updated:
+                    # 更新 Character
+                    bulk_operations = []
+                    for ladder_member in ladder_members:
+                        now = datetime.current_time()
+                        bulk_operations.append(
+                            UpdateOne(
+                                {"code": ladder_member["code"]},
+                                {
+                                    "$set": {
+                                        "code": ladder_member["code"],
+                                        "regionNo": ladder_member["regionNo"],
+                                        "realmNo": ladder_member["realmNo"],
+                                        "profileNo": ladder_member["profileNo"],
+                                        "displayName": ladder_member["displayName"],
+                                        "clanTag": ladder_member["clanTag"],
+                                        "clanName": ladder_member["clanName"],
+                                        "updateTime": now,
+                                    },
+                                    "$setOnInsert": {"createTime": now},
+                                },
+                                upsert=True,
+                            )
+                        )
+
+                    if len(bulk_operations) > 0:
+                        mongo.characters.bulk_write(bulk_operations)
+                        try:
+                            api.post("/character/batch", ladder_members)
+                        except:
+                            log.error(
+                                region_no, f"api character batch error, ladder members count: {len(ladder_members)}"
+                            )
+                            time.sleep(60)
+
+                else:
+                    # 通过新方法未能获取到 ladder 信息
+                    log.info(region_no, f"legacy ladder: {current_ladder_no}")
+                    inactive_ladder(region_no, current_ladder_no)
+            elif status_code < 500:
                 # 成员为空，将 ladder 置为非活跃
                 log.info(region_no, f"empty ladder: {current_ladder_no}")
                 inactive_ladder(region_no, current_ladder_no)
@@ -194,50 +237,6 @@ def ladder_task(region_no):
                         log.info(region_no, f"ladder task done success")
                     log.info(region_no, f"sleep 60s")
                     time.sleep(60)
-            else:
-                # 测试是否是正常数据（通过第一个 member 获取 ladder 数据）
-                ladder_updated = update_ladder(current_ladder_no, ladder_members[0])
-
-                if ladder_updated:
-                    # 更新 Character
-                    bulk_operations = []
-                    for ladder_member in ladder_members:
-                        now = datetime.current_time()
-                        bulk_operations.append(
-                            UpdateOne(
-                                {"code": ladder_member["code"]},
-                                {
-                                    "$set": {
-                                        "code": ladder_member["code"],
-                                        "regionNo": ladder_member["regionNo"],
-                                        "realmNo": ladder_member["realmNo"],
-                                        "profileNo": ladder_member["profileNo"],
-                                        "displayName": ladder_member["displayName"],
-                                        "clanTag": ladder_member["clanTag"],
-                                        "clanName": ladder_member["clanName"],
-                                        "updateTime": now,
-                                    },
-                                    "$setOnInsert": {"createTime": now},
-                                },
-                                upsert=True,
-                            )
-                        )
-
-                    if len(bulk_operations) > 0:
-                        mongo.characters.bulk_write(bulk_operations)
-                        try:
-                            api.post("/character/batch", ladder_members)
-                        except:
-                            log.error(
-                                region_no, f"api character batch error, ladder members count: {len(ladder_members)}"
-                            )
-                            time.sleep(60)
-
-                else:
-                    # 通过新方法未能获取到 ladder 信息
-                    log.info(region_no, f"legacy ladder: {current_ladder_no}")
-                    inactive_ladder(region_no, current_ladder_no)
-
         except:
             log.error(0, "task loop error")
             log.error(0, traceback.format_exc())
