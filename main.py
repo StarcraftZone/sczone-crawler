@@ -39,10 +39,12 @@ def inactive_teams(region_no, game_mode, teams):
         team_codes.append(team["code"])
     if len(bulk_operations) > 0:
         mongo.teams.bulk_write(bulk_operations)
-        api.post(
-            f"/team/batch/inactive",
-            {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes},
-        )
+
+        # api 有定时任务更新，无需从这里更新
+        # api.post(
+        #     f"/team/batch/inactive",
+        #     {"regionNo": region_no, "gameMode": game_mode, "codes": team_codes},
+        # )
         log.info(region_no, f"total inactive {len(team_codes)} teams")
 
 
@@ -183,6 +185,7 @@ def ladder_task(region_no_list):
                 max_active_ladder_no = get_max_active_ladder_no(region_no)
                 if current_ladder_no > max_active_ladder_no + 12:
                     if redis.lock(keys.ladder_task_done(region_no), timedelta(minutes=5)):
+                        # 这个 duration 有时候不可靠，过小，导致的 iops 高
                         task_duration_seconds = datetime.get_duration_seconds(
                             redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
                         )
@@ -200,7 +203,7 @@ def ladder_task(region_no_list):
                             },
                         )
 
-                        # 将当前 region 中 team 更新时间早于 ladder job startTime - task duration * 3 且活跃的 team 置为非活跃
+                        # 将当前 region 中 team 更新时间超过12小时且活跃的 team 置为非活跃
                         task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
                         for game_mode in [
                             "1v1",
@@ -217,14 +220,13 @@ def ladder_task(region_no_list):
                                     "regionNo": region_no,
                                     "gameMode": game_mode,
                                     "updateTime": {
-                                        "$lte": datetime.minus(
-                                            task_start_time, timedelta(seconds=task_duration_seconds * 3)
-                                        )
+                                        "$lte": datetime.minus(datetime.current_time(), timedelta(hours=12))
                                     },
                                     "active": 1,
                                 }
                             ).limit(10000)
 
+                            # api 有专门的定时任务去更新 active 状态；mongo 上的 active 更新意义不大，感觉可以不处理
                             inactive_teams(region_no, game_mode, teams_to_inactive)
 
                         redis.delete(keys.ladder_task_start_time(region_no))

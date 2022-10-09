@@ -31,6 +31,7 @@ def get_access_token():
             expires_in = response_data["expires_in"]
             redis.setex("token:battlenet", expires_in, access_token)
             log.info(0, "refresh access token: " + access_token)
+            redis.unlock("get_access_token")
         else:
             log.info(0, "wait for refreshing token")
             time.sleep(5)
