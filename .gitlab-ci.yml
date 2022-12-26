@@ -15,3 +15,6 @@ docker-build:
         - docker run -d -e TZ=Asia/Shanghai --name $PROJECT_NAME -v /volume3/docker/sczone-crawler/config.ini:/app/config.ini -v /volume3/docker/sczone-crawler/logs:/app/logs $PROJECT_NAME:latest
     only:
         - tags
+job:
+    tags:
+        - nuc
