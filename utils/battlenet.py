@@ -21,7 +21,7 @@ def get_access_token():
             bnetClientId = config.credentials["bnetClientId"]
             bnetClientSecret = config.credentials["bnetClientSecret"]
             response = requests.post(
-                "https://www.battlenet.com.cn/oauth/token",
+                "https://oauth.battle.net/token",
                 auth=(bnetClientId, bnetClientSecret),
                 data={"grant_type": "client_credentials"},
                 timeout=60,
@@ -45,7 +45,7 @@ def retry_failed(retry_state):
 
 
 # @retry(wait=wait_fixed(3), stop=stop_after_attempt(3), retry_error_callback=retry_failed)
-def get_api_response(path, api_region_no=5):
+def get_api_response(path, api_region_no=1):
     url = f"{origins[api_region_no]}{path}?locale=en_US&access_token={get_access_token()}"
     redis.incr(keys.stats_battlenet_api_request())
     response = requests.get(url, timeout=60)

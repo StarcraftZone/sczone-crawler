@@ -263,8 +263,7 @@ if __name__ == "__main__":
         log.error(0, "mongo create_index error")
         log.error(0, traceback.format_exc())
 
-    # region teams ratio, 4:4:1:3, set to 4:4:1:4 to update faster for CN
-    region_no_list = [1, 1, 1, 1, 2, 2, 2, 2, 3, 5, 5, 5, 5]
+    region_no_list = [1, 1, 2, 2, 3]
 
     # 遍历天梯成员任务
     threads = config.getint("app", "threadCount")
