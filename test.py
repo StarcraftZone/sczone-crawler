@@ -3,7 +3,6 @@ from pymongo import UpdateOne
 from bson import json_util
 from threading import Thread, Lock
 import time
-from tenacity import retry, wait_fixed, stop_after_attempt, RetryError
 
 # data = api.get_api_response("/ladder/1")
 # print(json.dumps(data))
@@ -67,7 +66,7 @@ from tenacity import retry, wait_fixed, stop_after_attempt, RetryError
 # response = api.get("/season/48")
 
 # print(response)
-log.debug(0, "d Hello, World!")
-log.info(0, "i Hello, World!")
-log.warn(0, "w Hello, World!")
-log.error(0, "e Hello, World!")
+log.debug(None, "d Hello, World!")
+log.info(None, "i Hello, World!")
+log.warn(None, "w Hello, World!")
+log.error(None, "e Hello, World!")
