@@ -84,18 +84,26 @@ def update_ladder(ladder_no, character):
 
 def get_min_active_ladder_no(region_no) -> int:
     active_ladder_count = mongo.ladders.count_documents({"regionNo": region_no, "active": 1})
-    if active_ladder_count > 0:
-        return mongo.ladders.findOne({"regionNo": region_no, "active": 1}, sort=[("number", pymongo.ASCENDING)])["number"]
-    else:
-        return mongo.ladders.findOne({"regionNo": region_no, "active": 0}, sort=[("number", pymongo.DESCENDING)])["number"]
+    ladder = (
+        mongo.ladders.find_one({"regionNo": region_no, "active": 1}, sort=[("number", pymongo.ASCENDING)])
+        if active_ladder_count > 0
+        else mongo.ladders.find_one({"regionNo": region_no, "active": 0}, sort=[("number", pymongo.DESCENDING)])
+    )
+    if ladder is None:
+        return 0
+    return ladder["number"]
 
 
 def get_max_active_ladder_no(region_no) -> int:
     active_ladder_count = mongo.ladders.count_documents({"regionNo": region_no, "active": 1})
-    if active_ladder_count > 0:
-        return mongo.ladders.findOne({"regionNo": region_no, "active": 1}, sort=[("number", pymongo.DESCENDING)])["number"]
-    else:
-        return mongo.ladders.findOne({"regionNo": region_no, "active": 0}, sort=[("number", pymongo.DESCENDING)])["number"]
+    ladder = (
+        mongo.ladders.find_one({"regionNo": region_no, "active": 1}, sort=[("number", pymongo.DESCENDING)])
+        if active_ladder_count > 0
+        else mongo.ladders.find_one({"regionNo": region_no, "active": 0}, sort=[("number", pymongo.DESCENDING)])
+    )
+    if ladder is None:
+        return 0
+    return ladder["number"]
 
 
 def ladder_task(region_no_list):
