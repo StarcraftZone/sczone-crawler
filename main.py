@@ -49,12 +49,12 @@ def inactive_teams(region_no, game_mode, teams):
 
 
 def update_ladder(ladder_no, character):
-    ladder, teams = battlenet.get_ladder_and_teams(
+    ladder, teams, status_code = battlenet.get_ladder_and_teams(
         character["regionNo"], character["realmNo"], character["profileNo"], ladder_no
     )
 
-    if ladder is None or len(teams) == 0:
-        return False
+    if status_code is None or ladder is None or len(teams) == 0:
+        return False, status_code
 
     ladder_active_status = redis.getset(f"status:region:{ladder['regionNo']}:ladder:{ladder['number']}:active", 1)
     if ladder_active_status != "1":
@@ -79,39 +79,23 @@ def update_ladder(ladder_no, character):
         mongo.teams.bulk_write(bulk_operations)
         api.post(f"/team/batch", teams)
 
-    return True
+    return True, status_code
 
 
-def get_min_active_ladder_no(region_no):
+def get_min_active_ladder_no(region_no) -> int:
     active_ladder_count = mongo.ladders.count_documents({"regionNo": region_no, "active": 1})
     if active_ladder_count > 0:
-        return (
-            mongo.ladders.find({"regionNo": region_no, "active": 1})
-            .sort("number", pymongo.ASCENDING)
-            .limit(1)[0]["number"]
-        )
+        return mongo.ladders.findOne({"regionNo": region_no, "active": 1}, sort=[("number", pymongo.ASCENDING)])["number"]
     else:
-        return (
-            mongo.ladders.find({"regionNo": region_no, "active": 0})
-            .sort("number", pymongo.DESCENDING)
-            .limit(1)[0]["number"]
-        )
+        return mongo.ladders.findOne({"regionNo": region_no, "active": 0}, sort=[("number", pymongo.DESCENDING)])["number"]
 
 
-def get_max_active_ladder_no(region_no):
+def get_max_active_ladder_no(region_no) -> int:
     active_ladder_count = mongo.ladders.count_documents({"regionNo": region_no, "active": 1})
     if active_ladder_count > 0:
-        return (
-            mongo.ladders.find({"regionNo": region_no, "active": 1})
-            .sort("number", pymongo.DESCENDING)
-            .limit(1)[0]["number"]
-        )
+        return mongo.ladders.findOne({"regionNo": region_no, "active": 1}, sort=[("number", pymongo.DESCENDING)])["number"]
     else:
-        return (
-            mongo.ladders.find({"regionNo": region_no, "active": 0})
-            .sort("number", pymongo.DESCENDING)
-            .limit(1)[0]["number"]
-        )
+        return mongo.ladders.findOne({"regionNo": region_no, "active": 0}, sort=[("number", pymongo.DESCENDING)])["number"]
 
 
 def ladder_task(region_no_list):
@@ -127,16 +111,27 @@ def ladder_task(region_no_list):
                 min_active_ladder_no = get_min_active_ladder_no(region_no)
                 log.info(region_no, f"ladder task start from ladder: {min_active_ladder_no}")
                 season = battlenet.get_season_info(region_no)
-                log.info(region_no, f"current season number: {season['number']}")
-                api.post(f"/season/crawler", season)
+                if season:
+                    log.info(region_no, f"current season number: {season['number']}")
+                    api.post(f"/season/crawler", season)
+                else:
+                    log.error(region_no, "get season info error")
                 redis.set(keys.ladder_task_current_no(region_no), min_active_ladder_no - 12)
             current_ladder_no = redis.incr(keys.ladder_task_current_no(region_no))
 
             ladder_members, status_code = battlenet.get_ladder_members(region_no, current_ladder_no)
+            if status_code is None:
+                log.info(region_no, f"sleep 60s")
+                time.sleep(60)
+                continue
+
             if len(ladder_members) > 0:
                 # 测试是否是正常数据（通过第一个 member 获取 ladder 数据）
-                ladder_updated = update_ladder(current_ladder_no, ladder_members[0])
-
+                ladder_updated, status_code = update_ladder(current_ladder_no, ladder_members[0])
+                if status_code is None:
+                    log.info(region_no, f"sleep 60s")
+                    time.sleep(60)
+                    continue
                 if ladder_updated:
                     # 更新 Character
                     bulk_operations = []
@@ -167,9 +162,7 @@ def ladder_task(region_no_list):
                         try:
                             api.post("/character/batch", ladder_members)
                         except:
-                            log.error(
-                                region_no, f"api character batch error, ladder members count: {len(ladder_members)}"
-                            )
+                            log.error(region_no, f"api character batch error, ladder members count: {len(ladder_members)}")
                             time.sleep(60)
 
                 else:
@@ -186,25 +179,26 @@ def ladder_task(region_no_list):
                 if current_ladder_no > max_active_ladder_no + 12:
                     if redis.lock(keys.ladder_task_done(region_no), timedelta(minutes=5)):
                         # 这个 duration 有时候不可靠，过小，导致的 iops 高
-                        task_duration_seconds = datetime.get_duration_seconds(
-                            redis.get(keys.ladder_task_start_time(region_no)), datetime.current_time_str()
-                        )
-                        log.info(
-                            region_no,
-                            f"ladder task done at ladder: {max_active_ladder_no}, duration: {task_duration_seconds}s",
-                        )
+                        ladder_task_start_time = redis.get(keys.ladder_task_start_time(region_no))
+                        if ladder_task_start_time:
+                            task_duration_seconds = datetime.get_duration_seconds(
+                                ladder_task_start_time, datetime.current_time_str()
+                            )
+                            log.info(
+                                region_no,
+                                f"ladder task done at ladder: {max_active_ladder_no}, duration: {task_duration_seconds}s",
+                            )
 
-                        stats.insert(
-                            region_no,
-                            "ladder_task",
-                            {
-                                "maxActiveLadderNo": max_active_ladder_no,
-                                "duration": task_duration_seconds,
-                            },
-                        )
+                            stats.insert(
+                                region_no,
+                                "ladder_task",
+                                {
+                                    "maxActiveLadderNo": max_active_ladder_no,
+                                    "duration": task_duration_seconds,
+                                },
+                            )
 
                         # 将当前 region 中 team 更新时间超过12小时且活跃的 team 置为非活跃
-                        task_start_time = datetime.get_time(redis.get(keys.ladder_task_start_time(region_no)))
                         for game_mode in [
                             "1v1",
                             "2v2",
@@ -219,9 +213,7 @@ def ladder_task(region_no_list):
                                 {
                                     "regionNo": region_no,
                                     "gameMode": game_mode,
-                                    "updateTime": {
-                                        "$lte": datetime.minus(datetime.current_time(), timedelta(hours=12))
-                                    },
+                                    "updateTime": {"$lte": datetime.minus(datetime.current_time(), timedelta(hours=12))},
                                     "active": 1,
                                 }
                             ).limit(10000)
@@ -237,6 +229,7 @@ def ladder_task(region_no_list):
             log.error(0, "task loop error")
             log.error(0, traceback.format_exc())
             # 出错后，休眠 1 分钟
+            log.info(0, f"sleep 60s")
             time.sleep(60)
 
 

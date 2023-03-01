@@ -1,10 +1,8 @@
-import time
 from datetime import timedelta
-
-import requests
-from tenacity import retry, stop_after_attempt, wait_fixed
-
+from typing import Tuple, Any
 from utils import config, datetime, keys, log, redis
+import requests
+import time
 
 origins = {
     1: "https://us.api.blizzard.com",
@@ -44,29 +42,36 @@ def retry_failed(retry_state):
     return None
 
 
-# @retry(wait=wait_fixed(3), stop=stop_after_attempt(3), retry_error_callback=retry_failed)
-def get_api_response(path, api_region_no=1):
+def get_api_response(path, api_region_no=1) -> Tuple[Any, int | None]:
     url = f"{origins[api_region_no]}{path}?locale=en_US&access_token={get_access_token()}"
     redis.incr(keys.stats_battlenet_api_request())
-    response = requests.get(url, timeout=60)
-    if response.status_code == 200:
-        response_data = response.json()
-        return response_data, response.status_code
-    elif response.status_code == 503 or response.status_code == 504 or response.status_code == 401:
-        log.info(0, f"使用官网接口重试: get {url}, status code: {response.status_code}, response: {response.text}")
-        new_response = requests.get(f"https://starcraft2.com/en-us/api{path}?locale=en_US", timeout=60)
-        if new_response.status_code == 200:
-            response_data = new_response.json()
-            return response_data, new_response.status_code
-        else:
+    try:
+        response = requests.get(url, timeout=60)
+        if response.status_code == 200:
+            response_data = response.json()
+            return response_data, response.status_code
+        elif response.status_code == 503 or response.status_code == 504 or response.status_code == 401:
+            log.info(0, f"使用官网接口重试: get {url}, status code: {response.status_code}, response: {response.text}")
+            new_response = requests.get(f"https://starcraft2.com/en-us/api{path}?locale=en_US", timeout=60)
+            if new_response.status_code == 200:
+                response_data = new_response.json()
+                return response_data, new_response.status_code
+            else:
+                log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
+        elif response.status_code != 404 and response.status_code != 400:
             log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
-    elif response.status_code != 404 and response.status_code != 400:
-        log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
-    return None, response.status_code
+        return None, response.status_code
+    except requests.exceptions.Timeout:
+        log.error(0, f"请求超时: {url}")
+    except requests.exceptions.ConnectionError:
+        log.error(0, f"请求错误: {url}")
+    return None, None
 
 
 def get_season_info(region_no):
     response, _ = get_api_response(f"/sc2/ladder/season/{region_no}")
+    if not response:
+        return None
     season = {
         "code": f"{region_no}_{response['seasonId']}",
         "regionNo": region_no,
@@ -120,7 +125,7 @@ def get_valid_mmr(team):
 
 # 获取角色下所有天梯
 def get_character_all_ladders(region_no, realm_no, profile_no):
-    response, _ = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/summary")
+    response, status_code = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/summary")
     ladders = []
     if response is not None:
         for membership in response["allLadderMemberships"]:
@@ -133,7 +138,7 @@ def get_character_all_ladders(region_no, realm_no, profile_no):
                     "gameMode": get_game_mode(membership["localizedGameMode"]),
                 }
             )
-    return ladders
+    return ladders, status_code
 
 
 # 获取天梯信息（过时接口）
@@ -159,7 +164,7 @@ def get_ladder_members(region_no, ladder_no):
 
 # 获取指定天梯中所有队伍
 def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
-    response, _ = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder_no}")
+    response, status_code = get_api_response(f"/sc2/profile/{region_no}/{realm_no}/{profile_no}/ladder/{ladder_no}")
     teams = []
     if response is not None and "currentLadderMembership" in response:
         ladder = {
@@ -202,5 +207,5 @@ def get_ladder_and_teams(region_no, realm_no, profile_no, ladder_no):
                     "teamMembers": team_members,
                 }
             )
-        return (ladder, teams)
-    return (None, [])
+        return (ladder, teams, status_code)
+    return (None, [], status_code)
