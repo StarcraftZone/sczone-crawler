@@ -226,10 +226,10 @@ def ladder_task(region_no_list):
                     log.info(region_no, f"sleep 60s")
                     time.sleep(60)
         except:
-            log.error(0, "task loop error")
-            log.error(0, traceback.format_exc())
+            log.error(None, "task loop error")
+            log.error(None, traceback.format_exc())
             # 出错后，休眠 1 分钟
-            log.info(0, f"sleep 60s")
+            log.info(None, f"sleep 60s")
             time.sleep(60)
 
 
@@ -253,8 +253,8 @@ if __name__ == "__main__":
         mongo.stats.create_index([("date", 1)], name="idx_date", background=True)
         mongo.stats.create_index([("type", 1)], name="idx_type", background=True)
     except:
-        log.error(0, "mongo create_index error")
-        log.error(0, traceback.format_exc())
+        log.error(None, "mongo create_index error")
+        log.error(None, traceback.format_exc())
 
     region_no_list = [1, 1, 2, 2, 3]
 
@@ -262,4 +262,4 @@ if __name__ == "__main__":
     threads = config.getint("app", "threadCount")
     for _ in range(threads):
         Thread(target=ladder_task, args=(region_no_list,)).start()
-    log.info(0, f"sczone crawler started, threads: {threads}")
+    log.info(None, f"sczone crawler started, threads: {threads}")

@@ -28,17 +28,17 @@ def get_access_token():
             access_token = response_data["access_token"]
             expires_in = response_data["expires_in"]
             redis.setex("token:battlenet", expires_in, access_token)
-            log.info(0, "refresh access token: " + access_token)
+            log.info(None, "refresh access token: " + access_token)
             redis.unlock("get_access_token")
         else:
-            log.info(0, "wait for refreshing token")
+            log.info(None, "wait for refreshing token")
             time.sleep(5)
             access_token = get_access_token()
     return access_token
 
 
 def retry_failed(retry_state):
-    log.error(0, f"请求重试失败: get {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
+    log.error(None, f"请求重试失败: get {retry_state.args[0]}, {retry_state.args[1]}, {retry_state.outcome.result()}")
     return None
 
 
@@ -51,20 +51,20 @@ def get_api_response(path, api_region_no=1) -> Tuple[Any, int | None]:
             response_data = response.json()
             return response_data, response.status_code
         elif response.status_code == 503 or response.status_code == 504 or response.status_code == 401:
-            log.info(0, f"使用官网接口重试: get {url}, status code: {response.status_code}, response: {response.text}")
+            log.info(None, f"使用官网接口重试: get {url}, status code: {response.status_code}, response: {response.text}")
             new_response = requests.get(f"https://starcraft2.com/en-us/api{path}?locale=en_US", timeout=60)
             if new_response.status_code == 200:
                 response_data = new_response.json()
                 return response_data, new_response.status_code
             else:
-                log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
+                log.error(None, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
         elif response.status_code != 404 and response.status_code != 400:
-            log.error(0, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
+            log.error(None, f"请求出错: get {url}, status code: {response.status_code}, response: {response.text}")
         return None, response.status_code
     except requests.exceptions.Timeout:
-        log.error(0, f"请求超时: {url}")
+        log.error(None, f"请求超时: {url}")
     except requests.exceptions.ConnectionError:
-        log.error(0, f"请求错误: {url}")
+        log.error(None, f"请求错误: {url}")
     return None, None
 
 
